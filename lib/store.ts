@@ -40,14 +40,18 @@ function redisStore(): Store {
   };
 }
 
+function hasRedisEnv() {
+  return (
+    (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) ||
+    (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+  );
+}
+
 let store: Store | null = null;
 
 export function getStore(): Store {
   if (!store) {
-    store =
-      process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-        ? redisStore()
-        : memoryStore();
+    store = hasRedisEnv() ? redisStore() : memoryStore();
   }
   return store;
 }
