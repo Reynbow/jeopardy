@@ -1,0 +1,244 @@
+(function () {
+  const boardEl = document.getElementById("board");
+  const answerBox = document.getElementById("answerBox");
+  const scoresEl = document.getElementById("scores");
+
+  let latest = null;
+
+  Game.onState((state) => {
+    latest = state;
+    render(state);
+  });
+
+  function render(state) {
+    const { settings, game } = state;
+    document.title = (settings.title || "Jeopardy") + " — Host";
+
+    const cols = settings.categories.length;
+    boardEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    boardEl.innerHTML = "";
+
+    settings.categories.forEach((cat) => {
+      const cell = document.createElement("div");
+      cell.className = "cat-cell";
+      cell.textContent = cat.name || "";
+      boardEl.appendChild(cell);
+    });
+
+    for (let r = 0; r < settings.rows; r++) {
+      settings.categories.forEach((cat, c) => {
+        const clue = cat.clues[r] || { question: "", answer: "" };
+        const tile = document.createElement("div");
+        const key = `${c}-${r}`;
+        const used = !!game.revealed[key];
+        const hasContent = (clue.question || "").trim().length > 0;
+        const isActive =
+          game.active && game.active.cat === c && game.active.row === r;
+
+        tile.className =
+          "tile" + (used ? " used" : "") + (!hasContent ? " empty" : "");
+        if (isActive) tile.style.outline = "3px solid var(--gold-bright)";
+
+        const v = document.createElement("div");
+        v.className = "value";
+        v.textContent = "$" + (settings.values[r] ?? 0);
+        tile.appendChild(v);
+
+        if (hasContent) {
+          tile.addEventListener("click", () =>
+            Game.send({ type: "reveal", cat: c, row: r })
+          );
+        }
+        boardEl.appendChild(tile);
+      });
+    }
+
+    renderAnswer(state);
+    renderScores(state);
+    renderBuzzPanel(state);
+    updateShowQuestionBtn(state);
+    updateShowAnswerBtn(state);
+  }
+
+  function updateShowQuestionBtn(state) {
+    const btn = document.getElementById("showQuestionBtn");
+    if (!btn) return;
+    const active = !!state.game.active;
+    btn.style.display = active ? "inline-block" : "none";
+    btn.disabled = !active || state.game.showQuestionToPlayers !== false;
+  }
+
+  function updateShowAnswerBtn(state) {
+    const btn = document.getElementById("showAnswerBtn");
+    if (!btn) return;
+    const active = !!state.game.active;
+    btn.style.display = active ? "inline-block" : "none";
+    btn.disabled = !active || !!state.game.showAnswerToPlayers;
+  }
+
+  function renderBuzzPanel(state) {
+    const panel = document.getElementById("buzzPanel");
+    if (!panel) return;
+
+    const buzzes = state.game.buzzes || [];
+    if (!buzzes.length || !state.game.active) {
+      panel.innerHTML = "";
+      panel.style.display = "none";
+      return;
+    }
+
+    panel.style.display = "block";
+    panel.innerHTML = "<h3>Buzz order</h3>";
+    const list = document.createElement("div");
+    list.className = "buzz-list";
+
+    const first = buzzes[0];
+    const players = state.players || [];
+
+    buzzes.forEach((b, i) => {
+      const p = players.find((pl) => pl.id === b.playerId);
+      const row = document.createElement("div");
+      row.className = "buzz-list-row" + (i === 0 ? " first" : "");
+      const name = document.createElement("span");
+      name.textContent = p ? p.name : "Unknown";
+      const time = document.createElement("span");
+      time.className = "buzz-list-time";
+      time.textContent = i === 0 ? "1st" : formatDelay(b.at - first.at);
+      row.appendChild(name);
+      row.appendChild(time);
+      list.appendChild(row);
+    });
+
+    panel.appendChild(list);
+  }
+
+  function formatDelay(ms) {
+    if (ms < 1000) return "+" + ms + "ms";
+    return "+" + (ms / 1000).toFixed(2) + "s";
+  }
+
+  function renderAnswer(state) {
+    const active = state.game.active;
+    if (!active) {
+      answerBox.innerHTML =
+        '<div class="ab-empty">No clue selected. Click a tile on the board (here or on the main screen).</div>';
+      return;
+    }
+    const cat = state.settings.categories[active.cat];
+    const clue = cat && cat.clues[active.row];
+    if (!clue) {
+      answerBox.innerHTML = '<div class="ab-empty">Clue unavailable.</div>';
+      return;
+    }
+    const val = state.settings.values[active.row] ?? 0;
+    answerBox.innerHTML = "";
+    const head = document.createElement("div");
+    head.className = "ab-cat";
+    head.textContent = `${cat.name || ""} — $${val}`;
+    const q = document.createElement("div");
+    q.className = "ab-q";
+    q.textContent = clue.question || "(no clue text)";
+    const a = document.createElement("div");
+    a.className = "ab-a";
+    a.textContent = "Answer: " + (clue.answer || "(no answer set)");
+    answerBox.appendChild(head);
+    answerBox.appendChild(q);
+    answerBox.appendChild(a);
+  }
+
+  function renderScores(state) {
+    const active = state.game.active;
+    const val = active ? state.settings.values[active.row] ?? 0 : 0;
+    scoresEl.innerHTML = "";
+
+    const players = state.players || [];
+    players.forEach((c, i) => {
+      const row = document.createElement("div");
+      row.className = "score-row";
+
+      const name = document.createElement("div");
+      name.className = "sr-name";
+      name.textContent = c.name || "";
+
+      const score = document.createElement("input");
+      score.type = "number";
+      score.className = "sr-score";
+      score.value = c.score;
+      score.addEventListener("change", () =>
+        Game.send({ type: "setScore", index: i, value: Number(score.value) })
+      );
+
+      const buttons = document.createElement("div");
+      buttons.className = "score-buttons";
+
+      if (active && val) {
+        const correct = document.createElement("button");
+        correct.className = "btn small correct";
+        correct.textContent = "+$" + val;
+        correct.title = "Correct answer";
+        correct.addEventListener("click", () =>
+          Game.send({ type: "adjustScore", index: i, delta: val })
+        );
+
+        const wrong = document.createElement("button");
+        wrong.className = "btn small wrong";
+        wrong.textContent = "-$" + val;
+        wrong.title = "Wrong answer";
+        wrong.addEventListener("click", () =>
+          Game.send({ type: "adjustScore", index: i, delta: -val })
+        );
+
+        buttons.appendChild(correct);
+        buttons.appendChild(wrong);
+      }
+
+      row.appendChild(name);
+      row.appendChild(score);
+      row.appendChild(buttons);
+      scoresEl.appendChild(row);
+    });
+  }
+
+  document
+    .getElementById("closeBtn")
+    .addEventListener("click", () => Game.send({ type: "closeClue" }));
+  document
+    .getElementById("showQuestionBtn")
+    ?.addEventListener("click", () => Game.send({ type: "showQuestion" }));
+  document
+    .getElementById("showAnswerBtn")
+    ?.addEventListener("click", () => Game.send({ type: "showAnswer" }));
+  document
+    .getElementById("resetGameBtn")
+    .addEventListener("click", () => {
+      if (confirm("Reset the board? All tiles will be playable again."))
+        Game.send({ type: "resetGame" });
+    });
+  document
+    .getElementById("resetScoresBtn")
+    .addEventListener("click", () => {
+      if (confirm("Reset all scores to 0?"))
+        Game.send({ type: "resetScores" });
+    });
+  document.getElementById("newGameBtn").addEventListener("click", () => {
+    if (confirm("Start a new game? Board and scores will reset."))
+      Game.send({ type: "newGame" });
+  });
+
+  // Share link + room code for players
+  const code = RoomSession.getCode();
+  if (code) {
+    const shareLink = document.getElementById("shareLink");
+    const shareCode = document.getElementById("shareCode");
+    const joinUrl = `${location.origin}/${code}`;
+    if (shareLink) shareLink.value = joinUrl;
+    if (shareCode) shareCode.textContent = code;
+    const badge = document.getElementById("roomBadge");
+    if (badge) badge.textContent = `· ${code}`;
+    document.getElementById("copyLinkBtn")?.addEventListener("click", () => {
+      navigator.clipboard.writeText(joinUrl).catch(() => {
+        shareLink?.select();
+      });
+    });
+  }
+})();
