@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { normalizeRoomCode } from "@/lib/codes";
 
 export default function LobbyPage() {
   const router = useRouter();
+  const [showKicked, setShowKicked] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("jeopardy_kicked") === "1") {
+      setShowKicked(true);
+      sessionStorage.removeItem("jeopardy_kicked");
+    }
+  }, []);
 
   async function createGame() {
     setError("");
@@ -45,6 +53,12 @@ export default function LobbyPage() {
       <div className="lobby-card">
         <h1 className="lobby-title">JEOPARDY!</h1>
         <p className="lobby-sub">Host a game or join with a room code</p>
+
+        {showKicked && (
+          <p className="lobby-error lobby-kicked-msg">
+            You were removed from the game by the host.
+          </p>
+        )}
 
         <button
           className="btn gold lobby-btn"

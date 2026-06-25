@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { isValidRoomCode, normalizeRoomCode } from "@/lib/codes";
 
 export default function JoinRoomPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const kicked = searchParams.get("kicked") === "1";
   const code = normalizeRoomCode(String(params.code || ""));
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -104,12 +102,6 @@ export default function JoinRoomPage() {
         <p className="lobby-sub">
           Room code: <strong className="room-code-display">{code}</strong>
         </p>
-        {kicked && (
-          <p className="lobby-error">
-            You were removed from the game by the host. You can rejoin with a
-            new name.
-          </p>
-        )}
         <input
           type="text"
           className="lobby-name-input"

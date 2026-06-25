@@ -57,9 +57,9 @@
       if (!res.ok) return;
       const data = await res.json();
       if (data.kicked && RoomSession.isPlayer()) {
-        const code = RoomSession.getCode();
         RoomSession.clear();
-        window.location.href = code ? `/${code}?kicked=1` : "/";
+        sessionStorage.setItem("jeopardy_kicked", "1");
+        window.location.href = "/";
         return;
       }
       if (data.state && stateHandler) {
@@ -93,9 +93,9 @@
         const data = await res.json();
         if (data.state && stateHandler) stateHandler(data.state);
       } else if (res.status === 403 && RoomSession.isPlayer()) {
-        const code = RoomSession.getCode();
         RoomSession.clear();
-        window.location.href = code ? `/${code}?kicked=1` : "/";
+        sessionStorage.setItem("jeopardy_kicked", "1");
+        window.location.href = "/";
         return;
       }
     } catch {

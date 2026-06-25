@@ -1016,6 +1016,10 @@ textarea:focus {
   font-size: 14px;
 }
 
+.lobby-kicked-msg {
+  margin-bottom: 20px;
+}
+
 .room-code-display {
   color: var(--gold-bright);
   letter-spacing: 3px;

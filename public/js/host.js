@@ -203,7 +203,7 @@
       kick.addEventListener("click", () => {
         const label = c.name || "this player";
         if (confirm(`Remove ${label} from the game?`)) {
-          Game.send({ type: "kickPlayer", playerId: c.id });
+          Game.send({ type: "kickPlayer", targetPlayerId: c.id });
         }
       });
       row.appendChild(kick);

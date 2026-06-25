@@ -109,7 +109,7 @@ export type ActionMessage =
   | { type: "resetScores" }
   | { type: "resetGame" }
   | { type: "newGame" }
-  | { type: "kickPlayer"; playerId: string };
+  | { type: "kickPlayer"; targetPlayerId: string };
 
 export async function handleAction(
   code: string,
@@ -216,7 +216,7 @@ export async function handleAction(
 
     case "kickPlayer": {
       if (!isHost) return { ok: false, error: "Host only" };
-      const idx = room.players.findIndex((p) => p.id === msg.playerId);
+      const idx = room.players.findIndex((p) => p.id === msg.targetPlayerId);
       if (idx === -1) return { ok: false, error: "Player not found" };
       room.players.splice(idx, 1);
       break;
