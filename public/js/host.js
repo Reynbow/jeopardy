@@ -195,6 +195,19 @@
       row.appendChild(name);
       row.appendChild(score);
       row.appendChild(buttons);
+
+      const kick = document.createElement("button");
+      kick.className = "btn small danger kick-btn";
+      kick.textContent = "Kick";
+      kick.title = "Remove from game";
+      kick.addEventListener("click", () => {
+        const label = c.name || "this player";
+        if (confirm(`Remove ${label} from the game?`)) {
+          Game.send({ type: "kickPlayer", playerId: c.id });
+        }
+      });
+      row.appendChild(kick);
+
       scoresEl.appendChild(row);
     });
   }

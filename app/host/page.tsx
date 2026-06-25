@@ -64,7 +64,7 @@ export default function HostPage() {
           </div>
 
           <div className="panel" style={{ marginTop: 16 }}>
-            <h2>Scores</h2>
+            <h2>Players &amp; scores</h2>
             <div id="scores" />
             <div className="host-actions">
               <button className="btn danger" id="resetScoresBtn">

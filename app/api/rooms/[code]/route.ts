@@ -25,6 +25,15 @@ export async function GET(
   const isHost = !!hostSecret && hostSecret === room.hostSecret;
   const isPlayer = !!playerId && room.players.some((p) => p.id === playerId);
 
+  if (playerId && !isHost && !isPlayer) {
+    return NextResponse.json({
+      kicked: true,
+      exists: true,
+      code: room.code,
+      title: room.settings.title,
+    });
+  }
+
   if (!isHost && !isPlayer) {
     return NextResponse.json({
       exists: true,

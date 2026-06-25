@@ -108,7 +108,8 @@ export type ActionMessage =
   | { type: "setScore"; index: number; value: number }
   | { type: "resetScores" }
   | { type: "resetGame" }
-  | { type: "newGame" };
+  | { type: "newGame" }
+  | { type: "kickPlayer"; playerId: string };
 
 export async function handleAction(
   code: string,
@@ -210,6 +211,14 @@ export async function handleAction(
       room.game.active = null;
       resetClueState(room);
       room.players.forEach((p) => (p.score = 0));
+      break;
+    }
+
+    case "kickPlayer": {
+      if (!isHost) return { ok: false, error: "Host only" };
+      const idx = room.players.findIndex((p) => p.id === msg.playerId);
+      if (idx === -1) return { ok: false, error: "Player not found" };
+      room.players.splice(idx, 1);
       break;
     }
 

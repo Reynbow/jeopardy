@@ -505,6 +505,11 @@ body:has(.play-bottom.has-clue) .board-wrap {
   text-align: center;
 }
 
+.score-row .kick-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .btn.correct {
   background: #1d6b3a;
   border-color: var(--good);

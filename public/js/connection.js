@@ -56,6 +56,12 @@
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
+      if (data.kicked && RoomSession.isPlayer()) {
+        const code = RoomSession.getCode();
+        RoomSession.clear();
+        window.location.href = code ? `/${code}?kicked=1` : "/";
+        return;
+      }
       if (data.state && stateHandler) {
         stateHandler(data.state);
       }
@@ -86,6 +92,11 @@
       if (res.ok) {
         const data = await res.json();
         if (data.state && stateHandler) stateHandler(data.state);
+      } else if (res.status === 403 && RoomSession.isPlayer()) {
+        const code = RoomSession.getCode();
+        RoomSession.clear();
+        window.location.href = code ? `/${code}?kicked=1` : "/";
+        return;
       }
     } catch {
       /* next poll will recover */
