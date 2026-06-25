@@ -35,6 +35,20 @@
   const POLL_MS = 400;
   let pollTimer = null;
   let stateHandler = null;
+  let lastRevision = -1;
+  let lastStateJson = "";
+  let sendInFlight = 0;
+
+  function deliverState(state, { fromAction = false } = {}) {
+    if (!state || !stateHandler) return;
+    const rev = typeof state.revision === "number" ? state.revision : 0;
+    if (!fromAction && rev < lastRevision) return;
+    const json = JSON.stringify(state);
+    if (!fromAction && rev === lastRevision && json === lastStateJson) return;
+    lastRevision = Math.max(lastRevision, rev);
+    lastStateJson = json;
+    stateHandler(state);
+  }
 
   function authQuery() {
     const params = new URLSearchParams();
@@ -48,6 +62,7 @@
   }
 
   async function fetchState() {
+    if (sendInFlight > 0) return;
     const code = RoomSession.getCode();
     if (!code) return;
     const qs = authQuery().toString();
@@ -62,9 +77,7 @@
         window.location.href = "/";
         return;
       }
-      if (data.state && stateHandler) {
-        stateHandler(data.state);
-      }
+      if (data.state) deliverState(data.state);
     } catch {
       /* retry on next poll */
     }
@@ -83,6 +96,7 @@
     if (RoomSession.isHost()) body.hostSecret = RoomSession.getHostSecret();
     if (RoomSession.getPlayerId()) body.playerId = RoomSession.getPlayerId();
 
+    sendInFlight++;
     try {
       const res = await fetch(`/api/rooms/${code}/action`, {
         method: "POST",
@@ -91,15 +105,18 @@
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.state && stateHandler) stateHandler(data.state);
-      } else if (res.status === 403 && RoomSession.isPlayer()) {
+        if (data.state) deliverState(data.state, { fromAction: true });
+        return;
+      }
+      if (res.status === 403 && RoomSession.isPlayer()) {
         RoomSession.clear();
         sessionStorage.setItem("jeopardy_kicked", "1");
         window.location.href = "/";
-        return;
       }
     } catch {
       /* next poll will recover */
+    } finally {
+      sendInFlight--;
     }
     fetchState();
   }
@@ -107,6 +124,8 @@
   window.Game = {
     onState(fn) {
       stateHandler = fn;
+      lastRevision = -1;
+      lastStateJson = "";
       fetchState();
       startPolling();
     },

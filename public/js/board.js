@@ -7,13 +7,24 @@
   const clueMeta = document.getElementById("clueMeta");
   const clueText = document.getElementById("clueText");
   const clueAnswer = document.getElementById("clueAnswer");
+  const audioCountdown = document.getElementById("audioCountdown");
 
   const isPlayer = RoomSession.isPlayer();
   const myId = RoomSession.getPlayerId();
+  let lastBuzzerKey = "";
 
   Game.onState((state) => {
     render(state);
   });
+
+  if (buzzerDock) {
+    buzzerDock.addEventListener("click", (e) => {
+      const btn = e.target.closest(".buzzer-btn");
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      Game.send({ type: "buzz" });
+    });
+  }
 
   function render(state) {
     const { settings, game } = state;
@@ -36,7 +47,7 @@
         const tile = document.createElement("div");
         const key = `${c}-${r}`;
         const used = !!game.revealed[key];
-        const hasContent = (clue.question || "").trim().length > 0;
+        const hasContent = ClueMedia.hasContent(clue);
         const isActive =
           game.active && game.active.cat === c && game.active.row === r;
 
@@ -110,12 +121,16 @@
     const active = !!state.game.active;
     const buzzes = state.game.buzzes || [];
     const myBuzzIdx = buzzes.findIndex((b) => b.playerId === myId);
-    const myBuzz = myBuzzIdx >= 0 ? buzzes[myBuzzIdx] : null;
-    const firstBuzz = buzzes[0];
+    const buzzerKey = `${active}:${myBuzzIdx}:${buzzes.length}`;
+    if (buzzerKey === lastBuzzerKey) return;
+    lastBuzzerKey = buzzerKey;
 
     buzzerDock.innerHTML = "";
 
     if (!active || !isPlayer) return;
+
+    const firstBuzz = buzzes[0];
+    const myBuzz = myBuzzIdx >= 0 ? buzzes[myBuzzIdx] : null;
 
     if (myBuzz && firstBuzz) {
       const status = document.createElement("div");
@@ -132,23 +147,22 @@
     const buzzBtn = document.createElement("button");
     buzzBtn.className = "btn buzzer-btn";
     buzzBtn.textContent = "BUZZ!";
-    buzzBtn.addEventListener("click", () => {
-      buzzBtn.disabled = true;
-      Game.send({ type: "buzz" });
-    });
     buzzerDock.appendChild(buzzBtn);
   }
 
   function renderOverlay(state) {
     const active = state.game.active;
     if (!active) {
+      ClueAudio.teardown();
       overlay.classList.remove("show");
       playBottom?.classList.remove("has-clue");
+      if (audioCountdown) audioCountdown.classList.remove("show");
       return;
     }
     const cat = state.settings.categories[active.cat];
     const clue = cat && cat.clues[active.row];
     if (!clue) {
+      ClueAudio.teardown();
       overlay.classList.remove("show");
       playBottom?.classList.remove("has-clue");
       return;
@@ -159,16 +173,17 @@
     const showQuestion =
       RoomSession.isHost() || state.game.showQuestionToPlayers !== false;
 
-    clueText.innerHTML = "";
-    if (showQuestion) {
-      clueText.textContent = clue.question || "";
-      clueText.classList.remove("hidden-clue");
+    if (ClueAudio.isAudioClue(clue)) {
+      ClueAudio.handleState(state, clueText, audioCountdown, {
+        isHost: RoomSession.isHost(),
+      });
     } else {
-      clueText.classList.add("hidden-clue");
-      const msg = document.createElement("div");
-      msg.className = "clue-hidden-msg";
-      msg.textContent = "Question hidden — someone buzzed in!";
-      clueText.appendChild(msg);
+      ClueAudio.teardown();
+      if (audioCountdown) audioCountdown.classList.remove("show");
+      clueText.classList.remove("hidden-clue");
+      ClueMedia.renderInto(clueText, clue, {
+        hidden: !showQuestion,
+      });
     }
 
     const answerText =

@@ -25,9 +25,131 @@
         clues: c.clues.map((q) => ({
           question: q.question || "",
           answer: q.answer || "",
+          imageUrl: q.imageUrl || "",
+          audioUrl: q.audioUrl || "",
         })),
       })),
     };
+  }
+
+  async function uploadMedia(file) {
+    const code = RoomSession.getCode();
+    const hostSecret = RoomSession.getHostSecret();
+    if (!code || !hostSecret) throw new Error("Host session required");
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("code", code);
+    form.append("hostSecret", hostSecret);
+
+    const res = await fetch("/api/upload", { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    return data.url;
+  }
+
+  function createMediaField(label, kind, clue, onUpdate) {
+    const field = document.createElement("div");
+    field.className = "clue-field clue-media-field";
+
+    const fieldLabel = document.createElement("label");
+    fieldLabel.textContent = label;
+    field.appendChild(fieldLabel);
+
+    const row = document.createElement("div");
+    row.className = "media-input-row";
+
+    const urlKey = kind === "image" ? "imageUrl" : "audioUrl";
+    const accept =
+      kind === "image"
+        ? "image/jpeg,image/png,image/gif,image/webp"
+        : "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4";
+
+    const urlInput = document.createElement("input");
+    urlInput.type = "url";
+    urlInput.className = "media-url-input";
+    urlInput.placeholder = kind === "image" ? "Image URL" : "Audio URL";
+    urlInput.value = clue[urlKey] || "";
+    urlInput.addEventListener("input", () => {
+      clue[urlKey] = urlInput.value.trim();
+      onUpdate();
+      scheduleSave();
+    });
+
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = accept;
+    fileInput.hidden = true;
+
+    const uploadBtn = document.createElement("button");
+    uploadBtn.type = "button";
+    uploadBtn.className = "btn small";
+    uploadBtn.textContent = "Upload";
+    uploadBtn.addEventListener("click", () => fileInput.click());
+
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "btn small danger";
+    clearBtn.textContent = "Clear";
+    clearBtn.addEventListener("click", () => {
+      clue[urlKey] = "";
+      urlInput.value = "";
+      onUpdate();
+      scheduleSave();
+    });
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = "…";
+      try {
+        const url = await uploadMedia(file);
+        clue[urlKey] = url;
+        urlInput.value = url;
+        onUpdate();
+        scheduleSave();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = "Upload";
+      }
+    });
+
+    row.appendChild(urlInput);
+    row.appendChild(uploadBtn);
+    row.appendChild(clearBtn);
+    row.appendChild(fileInput);
+    field.appendChild(row);
+
+    const preview = document.createElement("div");
+    preview.className = "media-preview";
+
+    function renderPreview() {
+      preview.innerHTML = "";
+      const url = (clue[urlKey] || "").trim();
+      if (!url) return;
+      if (kind === "image") {
+        const img = document.createElement("img");
+        img.className = "clue-image-preview";
+        img.src = url;
+        img.alt = "Preview";
+        preview.appendChild(img);
+      } else {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.src = url;
+        audio.className = "clue-audio-preview";
+        preview.appendChild(audio);
+      }
+    }
+
+    renderPreview();
+    field.appendChild(preview);
+
+    return { field, renderPreview };
   }
 
   let saveTimer = null;
@@ -115,9 +237,9 @@
         const qField = document.createElement("div");
         qField.className = "clue-field";
         const qLabel = document.createElement("label");
-        qLabel.textContent = "Question";
+        qLabel.textContent = "Question (text)";
         const q = document.createElement("textarea");
-        q.placeholder = "Shown on the board";
+        q.placeholder = "Optional text shown with the clue";
         q.value = cat.clues[r].question;
         q.addEventListener("input", () => {
           local.categories[c].clues[r].question = q.value;
@@ -125,6 +247,14 @@
         });
         qField.appendChild(qLabel);
         qField.appendChild(q);
+
+        const clue = cat.clues[r];
+        const imageField = createMediaField("Image", "image", clue, () =>
+          imageField.renderPreview()
+        );
+        const audioField = createMediaField("Audio", "audio", clue, () =>
+          audioField.renderPreview()
+        );
 
         const aField = document.createElement("div");
         aField.className = "clue-field";
@@ -142,6 +272,8 @@
 
         rowEl.appendChild(valLabel);
         rowEl.appendChild(qField);
+        rowEl.appendChild(imageField.field);
+        rowEl.appendChild(audioField.field);
         rowEl.appendChild(aField);
         rows.appendChild(rowEl);
       }
@@ -162,6 +294,8 @@
           clues: Array.from({ length: local.rows }, () => ({
             question: "",
             answer: "",
+            imageUrl: "",
+            audioUrl: "",
           })),
         });
       }
@@ -180,7 +314,7 @@
       for (let r = cur; r < n; r++) {
         local.values.push((r + 1) * 200);
         local.categories.forEach((cat) =>
-          cat.clues.push({ question: "", answer: "" })
+          cat.clues.push({ question: "", answer: "", imageUrl: "", audioUrl: "" })
         );
       }
     } else if (n < cur) {

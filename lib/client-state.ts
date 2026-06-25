@@ -1,5 +1,6 @@
 import type { Room } from "./types";
 import type { ClientState } from "./types";
+import { normalizeClue } from "./clue";
 
 function activeClueAnswer(room: Room): string | null {
   const active = room.game.active;
@@ -15,7 +16,10 @@ export function toClientState(room: Room, isHost: boolean): ClientState {
         ...room.settings,
         categories: room.settings.categories.map((cat) => ({
           name: cat.name,
-          clues: cat.clues.map((c) => ({ question: c.question, answer: "" })),
+          clues: cat.clues.map((c) => {
+            const clue = normalizeClue(c);
+            return { ...clue, answer: "" };
+          }),
         })),
       };
 
@@ -28,6 +32,8 @@ export function toClientState(room: Room, isHost: boolean): ClientState {
     settings,
     game: room.game,
     players: room.players,
+    revision: room.revision ?? 0,
+    serverTime: Date.now(),
     activeAnswer,
   };
 }

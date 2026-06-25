@@ -368,6 +368,42 @@ body:has(.play-bottom.has-clue) .board-wrap {
   text-shadow: 3px 3px 0 #000;
 }
 
+.clue-text-line {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: clamp(22px, 3.4vw, 52px);
+  line-height: 1.25;
+  text-transform: uppercase;
+  text-shadow: 3px 3px 0 #000;
+}
+
+.clue-image {
+  display: block;
+  max-width: min(100%, 720px);
+  max-height: min(50vh, 420px);
+  margin: 0 auto 16px;
+  border-radius: 8px;
+  object-fit: contain;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.clue-audio {
+  display: block;
+  width: min(100%, 480px);
+  margin: 0 auto 16px;
+}
+
+.answer-box .clue-image,
+.answer-box .clue-audio {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.answer-box .clue-text-line {
+  font-size: clamp(18px, 2.2vw, 28px);
+  text-transform: none;
+}
+
 .clue-answer {
   margin-top: 28px;
   padding-top: 22px;
@@ -700,6 +736,157 @@ textarea:focus {
   min-height: 64px;
 }
 
+.clue-media-field {
+  grid-column: 2 / -1;
+}
+
+.media-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.media-url-input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.media-preview {
+  margin-top: 8px;
+}
+
+.clue-image-preview {
+  max-width: 200px;
+  max-height: 120px;
+  border-radius: 6px;
+  object-fit: contain;
+  display: block;
+}
+
+.clue-audio-preview {
+  width: min(100%, 280px);
+}
+
+.audio-clue-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.2);
+  border: 1px solid var(--gold-bright);
+  color: var(--gold-bright);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.audio-clue-status {
+  margin: 8px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.audio-clue-player-wrap {
+  margin-top: 12px;
+}
+
+.audio-clue-slot {
+  height: 0;
+  overflow: hidden;
+}
+
+.audio-cache-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.audio-cache-bar-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #1d6b3a, var(--good));
+  transition: width 0.2s ease;
+}
+
+.audio-cache-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.audio-cache-name {
+  flex: 0 0 100px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-cache-pct {
+  flex: 0 0 52px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--gold-bright);
+  font-weight: 700;
+}
+
+.audio-host-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.audio-host-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+}
+
+.audio-countdown {
+  display: none;
+  margin: 20px auto 0;
+  width: 88px;
+  height: 88px;
+  line-height: 88px;
+  text-align: center;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.15);
+  border: 3px solid var(--gold-bright);
+  color: var(--gold-bright);
+  font-family: Georgia, serif;
+  font-size: 48px;
+  font-weight: 800;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.audio-countdown.show {
+  display: block;
+}
+
+.clue-card .audio-countdown {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  margin: 0;
+}
+
+.clue-card {
+  position: relative;
+}
+
+.answer-box .audio-countdown {
+  margin: 16px auto;
+}
+
 @media (max-width: 760px) {
   .clue-edit-row {
     grid-template-columns: 1fr;
@@ -708,6 +895,10 @@ textarea:focus {
   .clue-value-label {
     padding-top: 0;
     text-align: left;
+  }
+
+  .clue-media-field {
+    grid-column: 1 / -1;
   }
 }
 

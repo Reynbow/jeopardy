@@ -8,6 +8,11 @@ import {
   pruneGame,
 } from "./default-state";
 import { getStore } from "./store";
+import {
+  collectMediaUrls,
+  removeUnusedMedia,
+  syncRoomMedia,
+} from "./media";
 import type { GameSettings, Room } from "./types";
 
 function newHostSecret() {
@@ -22,6 +27,15 @@ function resetClueState(room: Room) {
   room.game.buzzes = [];
   room.game.showQuestionToPlayers = true;
   room.game.showAnswerToPlayers = false;
+  room.game.audioCache = {};
+  room.game.audioPlayAt = null;
+}
+
+function activeClueHasAudio(room: Room): boolean {
+  const active = room.game.active;
+  if (!active) return false;
+  const clue = room.settings.categories[active.cat]?.clues[active.row];
+  return !!((clue?.audioUrl || "").trim());
 }
 
 export async function createRoom(): Promise<{ code: string; hostSecret: string }> {
@@ -41,6 +55,7 @@ export async function createRoom(): Promise<{ code: string; hostSecret: string }
     game: defaultGame(),
     players: [],
     createdAt: Date.now(),
+    revision: 0,
   };
   await store.setRoom(room);
   return { code, hostSecret };
@@ -49,13 +64,18 @@ export async function createRoom(): Promise<{ code: string; hostSecret: string }
 export async function getRoom(code: string): Promise<Room | null> {
   const room = await getStore().getRoom(code);
   if (!room) return null;
+  if (typeof room.revision !== "number") room.revision = 0;
   room.game = normalizeGameState(room.game);
   return room;
 }
 
 export async function saveRoom(room: Room) {
+  const prev = await getStore().getRoom(room.code);
   room.game = normalizeGameState(room.game);
   pruneGame(room);
+  room.revision = (room.revision ?? 0) + 1;
+  await removeUnusedMedia(room.code, prev, room);
+  await syncRoomMedia(room.code, collectMediaUrls(room));
   await getStore().setRoom(room);
 }
 
@@ -109,7 +129,9 @@ export type ActionMessage =
   | { type: "resetScores" }
   | { type: "resetGame" }
   | { type: "newGame" }
-  | { type: "kickPlayer"; targetPlayerId: string };
+  | { type: "kickPlayer"; targetPlayerId: string }
+  | { type: "reportAudioCache"; percent: number; ready: boolean }
+  | { type: "startAudio" };
 
 export async function handleAction(
   code: string,
@@ -219,6 +241,28 @@ export async function handleAction(
       const idx = room.players.findIndex((p) => p.id === msg.targetPlayerId);
       if (idx === -1) return { ok: false, error: "Player not found" };
       room.players.splice(idx, 1);
+      break;
+    }
+
+    case "reportAudioCache": {
+      if (!isPlayer) return { ok: false, error: "Players only" };
+      if (!room.game.active || !activeClueHasAudio(room)) {
+        return { ok: false, error: "No audio clue active" };
+      }
+      const percent = Math.max(0, Math.min(100, Math.round(Number(msg.percent) || 0)));
+      room.game.audioCache[auth.playerId!] = {
+        percent,
+        ready: !!msg.ready,
+      };
+      break;
+    }
+
+    case "startAudio": {
+      if (!isHost) return { ok: false, error: "Host only" };
+      if (!room.game.active || !activeClueHasAudio(room)) {
+        return { ok: false, error: "No audio clue active" };
+      }
+      room.game.audioPlayAt = Date.now() + 3000;
       break;
     }
 

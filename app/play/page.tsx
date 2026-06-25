@@ -16,6 +16,7 @@ export default function PlayPage() {
           <div className="clue-meta" id="clueMeta" />
           <div className="clue-text" id="clueText" />
           <div className="clue-answer" id="clueAnswer" style={{ display: "none" }} />
+          <div className="audio-countdown" id="audioCountdown" aria-live="polite" />
         </div>
       </div>
       <Script src="/js/board.js" strategy="afterInteractive" />

@@ -4,6 +4,7 @@
   const scoresEl = document.getElementById("scores");
 
   let latest = null;
+  let lastAnswerKey = "";
 
   Game.onState((state) => {
     latest = state;
@@ -31,24 +32,21 @@
         const tile = document.createElement("div");
         const key = `${c}-${r}`;
         const used = !!game.revealed[key];
-        const hasContent = (clue.question || "").trim().length > 0;
+        const hasContent = ClueMedia.hasContent(clue);
         const isActive =
           game.active && game.active.cat === c && game.active.row === r;
 
         tile.className =
           "tile" + (used ? " used" : "") + (!hasContent ? " empty" : "");
         if (isActive) tile.style.outline = "3px solid var(--gold-bright)";
+        tile.dataset.cat = String(c);
+        tile.dataset.row = String(r);
 
         const v = document.createElement("div");
         v.className = "value";
         v.textContent = "$" + (settings.values[r] ?? 0);
         tile.appendChild(v);
 
-        if (hasContent) {
-          tile.addEventListener("click", () =>
-            Game.send({ type: "reveal", cat: c, row: r })
-          );
-        }
         boardEl.appendChild(tile);
       });
     }
@@ -56,6 +54,7 @@
     renderAnswer(state);
     renderScores(state);
     renderBuzzPanel(state);
+    renderAudioHostPanel(state);
     updateShowQuestionBtn(state);
     updateShowAnswerBtn(state);
   }
@@ -112,6 +111,69 @@
     panel.appendChild(list);
   }
 
+  function renderAudioHostPanel(state) {
+    const panel = document.getElementById("audioHostPanel");
+    const list = document.getElementById("audioCacheList");
+    const playBtn = document.getElementById("playAudioBtn");
+    if (!panel || !list) return;
+
+    const active = state.game.active;
+    let clue = null;
+    if (active) {
+      const cat = state.settings.categories[active.cat];
+      clue = cat && cat.clues[active.row];
+    }
+
+    if (!ClueAudio.isAudioClue(clue)) {
+      panel.style.display = "none";
+      return;
+    }
+
+    panel.style.display = "block";
+    list.innerHTML = "";
+
+    const cache = state.game.audioCache || {};
+    const players = state.players || [];
+
+    if (!players.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "No players joined yet.";
+      list.appendChild(empty);
+    }
+
+    players.forEach((p) => {
+      const entry = cache[p.id] || { percent: 0, ready: false };
+      const row = document.createElement("div");
+      row.className = "audio-cache-row";
+
+      const name = document.createElement("span");
+      name.className = "audio-cache-name";
+      name.textContent = p.name || "Player";
+
+      const bar = document.createElement("div");
+      bar.className = "audio-cache-bar";
+      const fill = document.createElement("div");
+      fill.className = "audio-cache-bar-fill";
+      fill.style.width = entry.percent + "%";
+      bar.appendChild(fill);
+
+      const pct = document.createElement("span");
+      pct.className = "audio-cache-pct";
+      pct.textContent = entry.ready ? "Ready" : entry.percent + "%";
+
+      row.appendChild(name);
+      row.appendChild(bar);
+      row.appendChild(pct);
+      list.appendChild(row);
+    });
+
+    if (playBtn) {
+      playBtn.disabled = !!state.game.audioPlayAt;
+      playBtn.style.display = state.game.audioPlayAt ? "none" : "inline-block";
+    }
+  }
+
   function formatDelay(ms) {
     if (ms < 1000) return "+" + ms + "ms";
     return "+" + (ms / 1000).toFixed(2) + "s";
@@ -120,6 +182,8 @@
   function renderAnswer(state) {
     const active = state.game.active;
     if (!active) {
+      lastAnswerKey = "";
+      ClueAudio.teardown();
       answerBox.innerHTML =
         '<div class="ab-empty">No clue selected. Click a tile on the board (here or on the main screen).</div>';
       return;
@@ -127,9 +191,23 @@
     const cat = state.settings.categories[active.cat];
     const clue = cat && cat.clues[active.row];
     if (!clue) {
+      lastAnswerKey = "";
       answerBox.innerHTML = '<div class="ab-empty">Clue unavailable.</div>';
       return;
     }
+
+    const key = `${active.cat}-${active.row}`;
+    const isAudio = ClueAudio.isAudioClue(clue);
+
+    if (isAudio && key === lastAnswerKey && answerBox.querySelector(".ab-q")) {
+      const q = answerBox.querySelector(".ab-q");
+      const countdown = answerBox.querySelector(".audio-countdown");
+      ClueAudio.handleState(state, q, countdown, { isHost: true });
+      return;
+    }
+
+    lastAnswerKey = isAudio ? key : "";
+
     const val = state.settings.values[active.row] ?? 0;
     answerBox.innerHTML = "";
     const head = document.createElement("div");
@@ -137,13 +215,28 @@
     head.textContent = `${cat.name || ""} — $${val}`;
     const q = document.createElement("div");
     q.className = "ab-q";
-    q.textContent = clue.question || "(no clue text)";
+
+    const countdown = document.createElement("div");
+    countdown.className = "audio-countdown";
+
     const a = document.createElement("div");
     a.className = "ab-a";
     a.textContent = "Answer: " + (clue.answer || "(no answer set)");
+
     answerBox.appendChild(head);
     answerBox.appendChild(q);
+    answerBox.appendChild(countdown);
     answerBox.appendChild(a);
+
+    if (ClueAudio.isAudioClue(clue)) {
+      ClueAudio.handleState(state, q, countdown, { isHost: true });
+    } else {
+      ClueAudio.teardown();
+      ClueMedia.renderInto(q, clue);
+      if (!ClueMedia.hasContent(clue)) {
+        q.textContent = "(no clue content)";
+      }
+    }
   }
 
   function renderScores(state) {
@@ -155,6 +248,8 @@
     players.forEach((c, i) => {
       const row = document.createElement("div");
       row.className = "score-row";
+      row.dataset.index = String(i);
+      row.dataset.playerId = c.id;
 
       const name = document.createElement("div");
       name.className = "sr-name";
@@ -164,9 +259,6 @@
       score.type = "number";
       score.className = "sr-score";
       score.value = c.score;
-      score.addEventListener("change", () =>
-        Game.send({ type: "setScore", index: i, value: Number(score.value) })
-      );
 
       const buttons = document.createElement("div");
       buttons.className = "score-buttons";
@@ -176,17 +268,11 @@
         correct.className = "btn small correct";
         correct.textContent = "+$" + val;
         correct.title = "Correct answer";
-        correct.addEventListener("click", () =>
-          Game.send({ type: "adjustScore", index: i, delta: val })
-        );
 
         const wrong = document.createElement("button");
         wrong.className = "btn small wrong";
         wrong.textContent = "-$" + val;
         wrong.title = "Wrong answer";
-        wrong.addEventListener("click", () =>
-          Game.send({ type: "adjustScore", index: i, delta: -val })
-        );
 
         buttons.appendChild(correct);
         buttons.appendChild(wrong);
@@ -200,17 +286,53 @@
       kick.className = "btn small danger kick-btn";
       kick.textContent = "Kick";
       kick.title = "Remove from game";
-      kick.addEventListener("click", () => {
-        const label = c.name || "this player";
-        if (confirm(`Remove ${label} from the game?`)) {
-          Game.send({ type: "kickPlayer", targetPlayerId: c.id });
-        }
-      });
       row.appendChild(kick);
 
       scoresEl.appendChild(row);
     });
   }
+
+  boardEl.addEventListener("click", (e) => {
+    const tile = e.target.closest(".tile:not(.used):not(.empty)");
+    if (!tile) return;
+    const cat = Number(tile.dataset.cat);
+    const row = Number(tile.dataset.row);
+    if (!Number.isInteger(cat) || !Number.isInteger(row)) return;
+    Game.send({ type: "reveal", cat, row });
+  });
+
+  scoresEl.addEventListener("click", (e) => {
+    const rowEl = e.target.closest(".score-row");
+    if (!rowEl) return;
+    const index = Number(rowEl.dataset.index);
+    const playerId = rowEl.dataset.playerId;
+    if (!Number.isInteger(index) || !playerId) return;
+
+    if (e.target.closest(".kick-btn")) {
+      const label = rowEl.querySelector(".sr-name")?.textContent || "this player";
+      if (confirm(`Remove ${label} from the game?`)) {
+        Game.send({ type: "kickPlayer", targetPlayerId: playerId });
+      }
+      return;
+    }
+
+    const active = latest?.game.active;
+    const val = active ? latest.settings.values[active.row] ?? 0 : 0;
+    if (e.target.closest(".btn.correct")) {
+      Game.send({ type: "adjustScore", index, delta: val });
+    } else if (e.target.closest(".btn.wrong")) {
+      Game.send({ type: "adjustScore", index, delta: -val });
+    }
+  });
+
+  scoresEl.addEventListener("change", (e) => {
+    if (!e.target.matches(".sr-score")) return;
+    const rowEl = e.target.closest(".score-row");
+    if (!rowEl) return;
+    const index = Number(rowEl.dataset.index);
+    if (!Number.isInteger(index)) return;
+    Game.send({ type: "setScore", index, value: Number(e.target.value) });
+  });
 
   document
     .getElementById("closeBtn")
@@ -221,6 +343,9 @@
   document
     .getElementById("showAnswerBtn")
     ?.addEventListener("click", () => Game.send({ type: "showAnswer" }));
+  document.getElementById("playAudioBtn")?.addEventListener("click", () => {
+    Game.send({ type: "startAudio" });
+  });
   document
     .getElementById("resetGameBtn")
     .addEventListener("click", () => {

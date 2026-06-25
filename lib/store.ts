@@ -1,7 +1,6 @@
 import { Redis } from "@upstash/redis";
 import type { Room } from "./types";
-
-const ROOM_TTL_SEC = 60 * 60 * 24; // 24 hours
+import { ROOM_TTL_SEC } from "./constants";
 
 interface Store {
   getRoom(code: string): Promise<Room | null>;

@@ -61,6 +61,14 @@ export default function HostPage() {
               </div>
             </div>
             <div className="buzz-panel" id="buzzPanel" style={{ display: "none" }} />
+            <div className="audio-host-panel" id="audioHostPanel" style={{ display: "none" }}>
+              <h3>Audio clue</h3>
+              <p className="hint">Wait until players have cached the file, then start playback.</p>
+              <div className="audio-cache-list" id="audioCacheList" />
+              <button className="btn gold" id="playAudioBtn" type="button">
+                Play audio (3s countdown)
+              </button>
+            </div>
           </div>
 
           <div className="panel" style={{ marginTop: 16 }}>

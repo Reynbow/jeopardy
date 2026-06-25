@@ -45,8 +45,8 @@ export default function SettingsPage() {
         <div className="section">
           <h2>Categories, questions &amp; answers</h2>
           <p className="hint">
-            The &quot;question&quot; is what players see on the board. The
-            &quot;answer&quot; is shown only on the host screen.
+            Each clue can use text, an image, audio, or any combination. Upload
+            files or paste a URL. The answer is shown only on the host screen.
           </p>
           <div className="row-values-strip scroll-pan-x" id="rowValuesStrip" />
           <div className="categories-editor" id="categoriesEditor" />

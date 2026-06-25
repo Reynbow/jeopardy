@@ -4,3 +4,6 @@ data/
 .vercel/
 .env*.local
 tsconfig.tsbuildinfo
+.vercel
+.env*
+public/uploads/

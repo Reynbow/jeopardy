@@ -1,4 +1,5 @@
 import type { GameSettings, Room } from "./types";
+import { normalizeClue } from "./clue";
 
 export function defaultSettings(): GameSettings {
   const values = [200, 400, 600, 800, 1000];
@@ -67,6 +68,8 @@ export function defaultGame() {
     buzzes: [] as { playerId: string; at: number }[],
     showQuestionToPlayers: true,
     showAnswerToPlayers: false,
+    audioCache: {} as Record<string, { percent: number; ready: boolean }>,
+    audioPlayAt: null as number | null,
   };
 }
 
@@ -80,6 +83,10 @@ export function normalizeGameState(
     : [];
   g.showQuestionToPlayers = g.showQuestionToPlayers !== false;
   g.showAnswerToPlayers = !!g.showAnswerToPlayers;
+  g.audioCache =
+    g.audioCache && typeof g.audioCache === "object" ? g.audioCache : {};
+  g.audioPlayAt =
+    typeof g.audioPlayAt === "number" ? g.audioPlayAt : null;
   return g;
 }
 
@@ -102,10 +109,7 @@ export function normalizeSettings(settings: Partial<GameSettings>): GameSettings
     const clues = Array.isArray(cat.clues) ? cat.clues : [];
     return {
       name: typeof cat.name === "string" ? cat.name : "",
-      clues: Array.from({ length: st.rows }, (_, i) => ({
-        question: clues[i]?.question ?? "",
-        answer: clues[i]?.answer ?? "",
-      })),
+      clues: Array.from({ length: st.rows }, (_, i) => normalizeClue(clues[i])),
     };
   });
 
@@ -133,4 +137,8 @@ export function pruneGame(room: Room) {
   // Drop buzzes from players who left
   const ids = new Set(room.players?.map((p) => p.id) || []);
   room.game.buzzes = room.game.buzzes.filter((b) => ids.has(b.playerId));
+  const cache = room.game.audioCache || {};
+  room.game.audioCache = Object.fromEntries(
+    Object.entries(cache).filter(([id]) => ids.has(id))
+  );
 }

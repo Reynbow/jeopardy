@@ -19,6 +19,8 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        <Script src="/js/clue-media.js" strategy="beforeInteractive" />
+        <Script src="/js/clue-audio.js" strategy="beforeInteractive" />
         <Script src="/js/connection.js" strategy="beforeInteractive" />
       </body>
     </html>
