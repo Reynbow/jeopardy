@@ -65,7 +65,7 @@ export async function createRoom(): Promise<{ code: string; hostSecret: string }
 }
 
 export async function getRoom(code: string): Promise<Room | null> {
-  const room = await getStore().getRoom(code);
+  const room = await getStore().getRoomFresh(code);
   if (!room) return null;
   if (typeof room.revision !== "number") room.revision = 0;
   room.game = normalizeGameState(room.game);
@@ -122,13 +122,13 @@ export async function joinRoom(
 
   if (existing) {
     existing.name = trimmed;
-    await saveRoom(room, { playersTouched: true });
+    await saveRoom(room);
     return { playerId: existing.id, room };
   }
 
   const playerId = newPlayerId();
   room.players.push({ id: playerId, name: trimmed, score: 0 });
-  await saveRoom(room, { playersTouched: true });
+  await saveRoom(room);
   return { playerId, room };
 }
 
@@ -200,9 +200,7 @@ export async function handleAction(
     case "updateSettings": {
       if (!isHost) return { ok: false, error: "Host only" };
       const incoming = msg.settings || {};
-      const oldPlayers = room.players;
       room.settings = normalizeSettings({ ...room.settings, ...incoming });
-      room.players = oldPlayers;
       break;
     }
 
