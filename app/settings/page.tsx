@@ -54,7 +54,7 @@ export default function SettingsPage() {
           </div>
           <p className="hint">
             Changes save automatically. Click a tile to edit its clue — switch
-            between text, image, or audio for each question. Answers are host-only.
+            between text, image, or audio for each question. Audio clues accept uploaded files or YouTube links (audio only during play). Answers are host-only.
           </p>
         </div>
 

@@ -275,7 +275,8 @@
     const urlInput = document.createElement("input");
     urlInput.type = "url";
     urlInput.className = "media-url-input";
-    urlInput.placeholder = kind === "image" ? "Image URL" : "Audio URL";
+    urlInput.placeholder =
+      kind === "image" ? "Image URL" : "Audio or YouTube URL";
     urlInput.value = clue[urlKey] || "";
     urlInput.addEventListener("input", () => {
       clue[urlKey] = urlInput.value.trim();
@@ -373,6 +374,16 @@
       img.src = url;
       img.alt = "Preview";
       preview.appendChild(img);
+    } else if (window.YouTubeAudio && YouTubeAudio.isYouTubeUrl(url)) {
+      const videoId = YouTubeAudio.parseVideoId(url);
+      const wrap = document.createElement("div");
+      wrap.className = "youtube-audio-preview";
+      const thumb = document.createElement("img");
+      thumb.className = "clue-image-preview";
+      thumb.src = "https://img.youtube.com/vi/" + videoId + "/hqdefault.jpg";
+      thumb.alt = "YouTube preview";
+      wrap.appendChild(thumb);
+      preview.appendChild(wrap);
     } else {
       const audio = document.createElement("audio");
       audio.controls = true;

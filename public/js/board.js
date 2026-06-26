@@ -9,6 +9,8 @@
   const clueText = document.getElementById("clueText");
   const clueAnswer = document.getElementById("clueAnswer");
   const audioCountdown = document.getElementById("audioCountdown");
+  const audioPlayerBar = document.getElementById("audioPlayerBar");
+  const audioVolume = document.getElementById("audioVolume");
 
   const isPlayer = RoomSession.isPlayer();
   const myId = RoomSession.getPlayerId();
@@ -51,6 +53,14 @@
       if (celebratedGoldenBuzzes.has(key)) return;
       celebratedGoldenBuzzes.add(key);
       fireGoldenConfetti();
+    });
+  }
+
+  if (audioVolume && window.ClueAudio) {
+    const stored = ClueAudio.getVolume();
+    audioVolume.value = String(Math.round(stored * 100));
+    audioVolume.addEventListener("input", () => {
+      ClueAudio.setVolume(Number(audioVolume.value) / 100);
     });
   }
 
@@ -255,6 +265,7 @@
       clueCard?.classList.remove("golden-buzz");
       playBottom?.classList.remove("has-clue");
       if (audioCountdown) audioCountdown.classList.remove("show");
+      if (audioPlayerBar) audioPlayerBar.style.display = "none";
       return;
     }
     const cat = state.settings.categories[active.cat];
@@ -275,13 +286,20 @@
     const showQuestion =
       RoomSession.isHost() || state.game.showQuestionToPlayers !== false;
 
-    if (ClueAudio.isAudioClue(clue)) {
+    const isAudio = ClueAudio.isAudioClue(clue);
+    if (audioPlayerBar) {
+      audioPlayerBar.style.display = isAudio ? "flex" : "none";
+    }
+
+    if (isAudio) {
       ClueAudio.handleState(state, clueText, audioCountdown, {
         isHost: RoomSession.isHost(),
       });
     } else {
       ClueAudio.teardown();
       if (audioCountdown) audioCountdown.classList.remove("show");
+      const block = document.getElementById("audioCountdownBlock");
+      if (block) block.classList.remove("show");
       clueText.classList.remove("hidden-clue");
       ClueMedia.renderInto(clueText, clue, {
         hidden: !showQuestion,

@@ -66,9 +66,17 @@ export default function HostPage() {
               <h3>Audio clue</h3>
               <p className="hint">Wait until players have cached the file, then start playback.</p>
               <div className="audio-cache-list" id="audioCacheList" />
-              <button className="btn gold" id="playAudioBtn" type="button">
-                Play audio (3s countdown)
-              </button>
+              <div className="audio-host-actions">
+                <button className="btn gold" id="playAudioBtn" type="button">
+                  Play audio (3s countdown)
+                </button>
+                <button className="btn" id="pauseAudioBtn" type="button" style={{ display: "none" }}>
+                  Pause
+                </button>
+                <button className="btn" id="restartAudioBtn" type="button" style={{ display: "none" }}>
+                  Restart
+                </button>
+              </div>
             </div>
           </div>
 

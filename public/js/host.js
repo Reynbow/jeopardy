@@ -159,6 +159,8 @@
     const panel = document.getElementById("audioHostPanel");
     const list = document.getElementById("audioCacheList");
     const playBtn = document.getElementById("playAudioBtn");
+    const pauseBtn = document.getElementById("pauseAudioBtn");
+    const restartBtn = document.getElementById("restartAudioBtn");
     if (!panel || !list) return;
 
     const active = state.game.active;
@@ -212,9 +214,17 @@
       list.appendChild(row);
     });
 
+    const playAt = state.game.audioPlayAt;
+    const paused = !!state.game.audioPaused;
+
     if (playBtn) {
-      playBtn.disabled = !!state.game.audioPlayAt;
-      playBtn.style.display = state.game.audioPlayAt ? "none" : "inline-block";
+      playBtn.style.display = !playAt ? "inline-block" : "none";
+    }
+    if (pauseBtn) {
+      pauseBtn.style.display = playAt && !paused ? "inline-block" : "none";
+    }
+    if (restartBtn) {
+      restartBtn.style.display = playAt ? "inline-block" : "none";
     }
   }
 
@@ -402,6 +412,12 @@
     ?.addEventListener("click", () => Game.send({ type: "showAnswer" }));
   document.getElementById("playAudioBtn")?.addEventListener("click", () => {
     Game.send({ type: "startAudio" });
+  });
+  document.getElementById("pauseAudioBtn")?.addEventListener("click", () => {
+    Game.send({ type: "pauseAudio" });
+  });
+  document.getElementById("restartAudioBtn")?.addEventListener("click", () => {
+    Game.send({ type: "restartAudio" });
   });
   document
     .getElementById("resetGameBtn")

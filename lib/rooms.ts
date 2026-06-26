@@ -29,6 +29,9 @@ function resetClueState(room: Room) {
   room.game.showAnswerToPlayers = false;
   room.game.audioCache = {};
   room.game.audioPlayAt = null;
+  room.game.audioPaused = false;
+  room.game.audioPositionMs = 0;
+  room.game.audioControlRev = 0;
 }
 
 function activeClueHasAudio(room: Room): boolean {
@@ -139,7 +142,9 @@ export type ActionMessage =
   | { type: "newGame" }
   | { type: "kickPlayer"; targetPlayerId: string }
   | { type: "reportAudioCache"; percent: number; ready: boolean }
-  | { type: "startAudio" };
+  | { type: "startAudio" }
+  | { type: "pauseAudio" }
+  | { type: "restartAudio" };
 
 export async function handleAction(
   code: string,
@@ -310,7 +315,38 @@ export async function handleAction(
       if (!room.game.active || !activeClueHasAudio(room)) {
         return { ok: false, error: "No audio clue active" };
       }
+      room.game.audioPaused = false;
+      room.game.audioPositionMs = 0;
       room.game.audioPlayAt = Date.now() + 3000;
+      room.game.audioControlRev = (room.game.audioControlRev || 0) + 1;
+      break;
+    }
+
+    case "pauseAudio": {
+      if (!isHost) return { ok: false, error: "Host only" };
+      if (!room.game.active || !activeClueHasAudio(room)) {
+        return { ok: false, error: "No audio clue active" };
+      }
+      if (!room.game.audioPlayAt || room.game.audioPaused) {
+        return { ok: false, error: "Audio is not playing" };
+      }
+      const now = Date.now();
+      room.game.audioPaused = true;
+      room.game.audioPositionMs =
+        now > room.game.audioPlayAt ? now - room.game.audioPlayAt : 0;
+      room.game.audioControlRev = (room.game.audioControlRev || 0) + 1;
+      break;
+    }
+
+    case "restartAudio": {
+      if (!isHost) return { ok: false, error: "Host only" };
+      if (!room.game.active || !activeClueHasAudio(room)) {
+        return { ok: false, error: "No audio clue active" };
+      }
+      room.game.audioPaused = false;
+      room.game.audioPositionMs = 0;
+      room.game.audioPlayAt = Date.now() + 3000;
+      room.game.audioControlRev = (room.game.audioControlRev || 0) + 1;
       break;
     }
 

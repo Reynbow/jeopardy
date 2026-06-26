@@ -5,7 +5,7 @@ export interface Clue {
   promptType?: "text" | "image" | "audio";
   /** Optional image shown with the clue (URL from upload or external link). */
   imageUrl?: string;
-  /** Optional audio played with the clue (URL from upload or external link). */
+  /** Optional audio or YouTube link played with the clue (audio only in game). */
   audioUrl?: string;
 }
 
@@ -46,6 +46,12 @@ export interface GameState {
   audioCache: Record<string, AudioCacheEntry>;
   /** Server timestamp (ms) when synced audio playback should start. */
   audioPlayAt: number | null;
+  /** When true, all clients pause at audioPositionMs. */
+  audioPaused?: boolean;
+  /** Playback offset (ms) when paused or rescheduled. */
+  audioPositionMs?: number;
+  /** Bumped on each host audio control action so clients re-sync. */
+  audioControlRev?: number;
   /** Players who have spent their one golden buzzer this game. */
   goldenUsed: Record<string, boolean>;
 }

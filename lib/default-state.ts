@@ -70,6 +70,9 @@ export function defaultGame() {
     showAnswerToPlayers: false,
     audioCache: {} as Record<string, { percent: number; ready: boolean }>,
     audioPlayAt: null as number | null,
+    audioPaused: false,
+    audioPositionMs: 0,
+    audioControlRev: 0,
     goldenUsed: {} as Record<string, boolean>,
   };
 }
@@ -88,6 +91,15 @@ export function normalizeGameState(
     g.audioCache && typeof g.audioCache === "object" ? g.audioCache : {};
   g.audioPlayAt =
     typeof g.audioPlayAt === "number" ? g.audioPlayAt : null;
+  g.audioPaused = !!g.audioPaused;
+  g.audioPositionMs =
+    typeof g.audioPositionMs === "number" && g.audioPositionMs >= 0
+      ? g.audioPositionMs
+      : 0;
+  g.audioControlRev =
+    typeof g.audioControlRev === "number" && g.audioControlRev >= 0
+      ? g.audioControlRev
+      : 0;
   g.goldenUsed =
     g.goldenUsed && typeof g.goldenUsed === "object" ? g.goldenUsed : {};
   return g;

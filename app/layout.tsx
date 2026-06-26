@@ -20,6 +20,7 @@ export default function RootLayout({
       <body>
         {children}
         <Script src="/js/clue-media.js" strategy="beforeInteractive" />
+        <Script src="/js/youtube-audio.js" strategy="beforeInteractive" />
         <Script src="/js/clue-audio.js" strategy="beforeInteractive" />
         <Script src="/js/connection.js" strategy="beforeInteractive" />
         <Script src="/js/golden-confetti.js" strategy="beforeInteractive" />

@@ -179,6 +179,30 @@ body:has(.play-layout) {
   padding: 0 16px clamp(10px, 1.5vh, 18px);
 }
 
+.audio-player-bar {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px clamp(10px, 2vw, 28px) 4px;
+  pointer-events: auto;
+}
+
+.audio-volume-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.audio-volume-slider {
+  width: min(200px, 42vw);
+  accent-color: var(--gold-bright);
+  cursor: pointer;
+}
+
 /* -------------------------------------------------------------- BOARD */
 .board-wrap {
   padding: 18px clamp(10px, 3vw, 40px);
@@ -434,18 +458,49 @@ body:has(.play-layout) {
 
 .overlay.show {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   padding-bottom: min(220px, 28vh);
-  align-items: flex-start;
   padding-top: 4vh;
+}
+
+.overlay-clue-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(1100px, 96vw);
+  max-width: 100%;
+}
+
+.audio-countdown-block {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.audio-countdown-block.show {
+  display: flex;
+}
+
+.audio-countdown-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold-bright);
 }
 
 .clue-card {
   position: relative;
   z-index: 1;
+  width: 100%;
   background: var(--jeopardy-blue);
   border: 4px solid #050a6b;
   border-radius: 10px;
-  width: min(1100px, 96vw);
   min-height: min(60vh, 540px);
   display: flex;
   flex-direction: column;
@@ -1372,6 +1427,25 @@ textarea:focus {
   overflow: hidden;
 }
 
+.youtube-audio-player {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+  margin: -1px;
+}
+
+.youtube-audio-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .audio-cache-bar {
   flex: 1;
   height: 10px;
@@ -1425,38 +1499,32 @@ textarea:focus {
   color: var(--gold-bright);
 }
 
+.audio-host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .audio-countdown {
   display: none;
-  margin: 20px auto 0;
-  width: 88px;
-  height: 88px;
-  line-height: 88px;
+  width: 72px;
+  height: 72px;
+  line-height: 72px;
   text-align: center;
   border-radius: 50%;
   background: rgba(212, 175, 55, 0.15);
   border: 3px solid var(--gold-bright);
   color: var(--gold-bright);
   font-family: Georgia, serif;
-  font-size: 48px;
+  font-size: 42px;
   font-weight: 800;
   text-shadow: 2px 2px 0 #000;
+  flex-shrink: 0;
 }
 
 .audio-countdown.show {
   display: block;
-}
-
-.clue-card .audio-countdown {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-  margin: 0;
-}
-
-.clue-card {
-  position: relative;
 }
 
 .answer-box .audio-countdown {
