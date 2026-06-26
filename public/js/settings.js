@@ -11,10 +11,45 @@
 
   let local = null;
   let saveTimer = null;
+  const modeDrafts = {};
+
+  function draftKey(c, r) {
+    return `${c}-${r}`;
+  }
+
+  function getDrafts(c, r) {
+    const key = draftKey(c, r);
+    if (!modeDrafts[key]) {
+      modeDrafts[key] = { text: "", imageCaption: "", audioCaption: "" };
+    }
+    return modeDrafts[key];
+  }
+
+  function initAllDrafts() {
+    Object.keys(modeDrafts).forEach((k) => delete modeDrafts[k]);
+    if (!local) return;
+    local.categories.forEach((cat, c) => {
+      cat.clues.forEach((clue, r) => {
+        const drafts = getDrafts(c, r);
+        const mode = clue.promptType || inferMode(clue);
+        drafts.text = "";
+        drafts.imageCaption = "";
+        drafts.audioCaption = "";
+        if (mode === "text") {
+          drafts.text = clue.question || "";
+        } else if (mode === "image") {
+          drafts.imageCaption = clue.question || "";
+        } else if (mode === "audio") {
+          drafts.audioCaption = clue.question || "";
+        }
+      });
+    });
+  }
 
   Game.onState((state) => {
     if (!local) {
       local = cloneSettings(state.settings);
+      initAllDrafts();
       renderAll();
     }
   });
@@ -153,7 +188,27 @@
 
   function setClueMode(c, r, mode) {
     const clue = local.categories[c].clues[r];
+    const prev = clue.promptType || inferMode(clue);
+    const drafts = getDrafts(c, r);
+
+    if (prev === "text") drafts.text = clue.question;
+    else if (prev === "image") drafts.imageCaption = clue.question;
+    else if (prev === "audio") drafts.audioCaption = clue.question;
+
     clue.promptType = mode;
+
+    if (mode === "text") {
+      clue.question = drafts.text;
+      clue.imageUrl = "";
+      clue.audioUrl = "";
+    } else if (mode === "image") {
+      clue.question = drafts.imageCaption;
+      clue.audioUrl = "";
+    } else if (mode === "audio") {
+      clue.question = drafts.audioCaption;
+      clue.imageUrl = "";
+    }
+
     const tile = boardEl.querySelector(
       `.settings-tile[data-cat="${c}"][data-row="${r}"]`
     );
@@ -183,9 +238,10 @@
       ta.className = "settings-clue-text";
       ta.placeholder = "Clue text";
       ta.rows = 3;
-      ta.value = clue.question;
+      ta.value = getDrafts(c, r).text;
       ta.addEventListener("input", () => {
         clue.question = ta.value;
+        getDrafts(c, r).text = ta.value;
         scheduleSave();
       });
       body.appendChild(ta);
@@ -279,6 +335,29 @@
     preview.className = "media-preview";
     renderMediaPreview(preview, clue, kind);
     wrap.appendChild(preview);
+
+    const captionWrap = document.createElement("div");
+    captionWrap.className = "settings-media-caption-wrap";
+    const captionLabel = document.createElement("label");
+    captionLabel.textContent = "Optional text";
+    const caption = document.createElement("textarea");
+    caption.className = "settings-clue-text settings-media-caption";
+    caption.placeholder =
+      kind === "image"
+        ? "Shown below the image (optional)"
+        : "Shown during the audio clue (optional)";
+    caption.rows = 2;
+    const draftKey =
+      kind === "image" ? "imageCaption" : "audioCaption";
+    caption.value = getDrafts(c, r)[draftKey];
+    caption.addEventListener("input", () => {
+      clue.question = caption.value;
+      getDrafts(c, r)[draftKey] = caption.value;
+      scheduleSave();
+    });
+    captionWrap.appendChild(captionLabel);
+    captionWrap.appendChild(caption);
+    wrap.appendChild(captionWrap);
 
     return wrap;
   }
@@ -413,6 +492,7 @@
     local.categories.forEach((cat) => {
       cat.clues = cat.clues.map(() => emptyClue());
     });
+    initAllDrafts();
     renderBoard();
     save();
   }
