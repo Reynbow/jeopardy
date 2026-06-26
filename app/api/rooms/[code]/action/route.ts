@@ -27,8 +27,18 @@ export async function POST(
     playerId,
   });
 
-  if (!result.ok || !result.room) {
-    return NextResponse.json({ error: result.error || "Failed" }, { status: 403 });
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error: result.error || "Failed",
+        ...(result.kicked ? { kicked: true } : {}),
+      },
+      { status: result.kicked ? 403 : 400 }
+    );
+  }
+
+  if (!result.room) {
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 
   const isHost = !!hostSecret && hostSecret === result.room.hostSecret;

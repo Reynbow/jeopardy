@@ -164,7 +164,13 @@
         kickBurstPoll();
         return;
       }
-      if (res.status === 403 && RoomSession.isPlayer()) {
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        /* ignore */
+      }
+      if (data.kicked && RoomSession.isPlayer()) {
         RoomSession.clear();
         sessionStorage.setItem("jeopardy_kicked", "1");
         window.location.href = "/";

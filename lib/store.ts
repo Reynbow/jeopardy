@@ -4,6 +4,8 @@ import { ROOM_TTL_SEC } from "./constants";
 
 interface Store {
   getRoom(code: string): Promise<Room | null>;
+  /** Always reads from the backing store (bypasses the in-process cache). */
+  getRoomFresh(code: string): Promise<Room | null>;
   setRoom(room: Room): Promise<void>;
 }
 
@@ -20,6 +22,9 @@ function memoryStore(): Store {
     async getRoom(code) {
       return map.get(code) ?? null;
     },
+    async getRoomFresh(code) {
+      return map.get(code) ?? null;
+    },
     async setRoom(room) {
       map.set(room.code, room);
     },
@@ -30,6 +35,10 @@ function redisStore(): Store {
   const redis = Redis.fromEnv();
   return {
     async getRoom(code) {
+      const data = await redis.get<Room>(roomKey(code));
+      return data ?? null;
+    },
+    async getRoomFresh(code) {
       const data = await redis.get<Room>(roomKey(code));
       return data ?? null;
     },
@@ -64,6 +73,12 @@ function cachedStore(inner: Store): Store {
       if (hit) return cloneRoom(hit);
       const data = await inner.getRoom(code);
       if (data) cache.set(code, cloneRoom(data));
+      return data;
+    },
+    async getRoomFresh(code) {
+      const data = await inner.getRoomFresh(code);
+      if (data) cache.set(code, cloneRoom(data));
+      else cache.delete(code);
       return data;
     },
     async setRoom(room) {

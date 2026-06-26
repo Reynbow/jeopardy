@@ -13,7 +13,7 @@ import {
   removeUnusedMedia,
   syncRoomMedia,
 } from "./media";
-import type { GameSettings, Room } from "./types";
+import type { GameSettings, Player, Room } from "./types";
 
 function newHostSecret() {
   return randomBytes(24).toString("hex");
@@ -72,21 +72,37 @@ export async function getRoom(code: string): Promise<Room | null> {
   return room;
 }
 
+function mergePlayerLists(fresh: Player[], local: Player[]): Player[] {
+  const byId = new Map(fresh.map((p) => [p.id, p]));
+  for (const p of local) {
+    if (!byId.has(p.id)) byId.set(p.id, p);
+  }
+  return Array.from(byId.values());
+}
+
 export async function saveRoom(
   room: Room,
-  options: { syncMedia?: boolean } = {}
+  options: { syncMedia?: boolean; playersTouched?: boolean } = {}
 ) {
   room.game = normalizeGameState(room.game);
   pruneGame(room);
+
+  const store = getStore();
+  const fresh = await store.getRoomFresh(room.code);
+  if (fresh && !options.playersTouched) {
+    room.players = mergePlayerLists(fresh.players, room.players);
+    room.revision = Math.max(fresh.revision ?? 0, room.revision ?? 0);
+  }
+
   room.revision = (room.revision ?? 0) + 1;
 
   if (options.syncMedia) {
-    const prev = await getStore().getRoom(room.code);
+    const prev = fresh ?? (await store.getRoomFresh(room.code));
     await removeUnusedMedia(room.code, prev, room);
     await syncRoomMedia(room.code, collectMediaUrls(room));
   }
 
-  await getStore().setRoom(room);
+  await store.setRoom(room);
 }
 
 export async function joinRoom(
@@ -106,13 +122,13 @@ export async function joinRoom(
 
   if (existing) {
     existing.name = trimmed;
-    await saveRoom(room);
+    await saveRoom(room, { playersTouched: true });
     return { playerId: existing.id, room };
   }
 
   const playerId = newPlayerId();
   room.players.push({ id: playerId, name: trimmed, score: 0 });
-  await saveRoom(room);
+  await saveRoom(room, { playersTouched: true });
   return { playerId, room };
 }
 
@@ -146,16 +162,39 @@ export type ActionMessage =
   | { type: "pauseAudio" }
   | { type: "restartAudio" };
 
+export type ActionResult = {
+  ok: boolean;
+  error?: string;
+  room?: Room;
+  /** Player session is no longer valid — client should leave the game. */
+  kicked?: boolean;
+  /** Action succeeded without persisting (e.g. stale audio cache report). */
+  skipSave?: boolean;
+};
+
+function playerMissing(
+  room: Room,
+  auth: { hostSecret?: string; playerId?: string }
+): ActionResult | null {
+  if (!auth.playerId || auth.hostSecret) return null;
+  if (room.players.some((p) => p.id === auth.playerId)) return null;
+  return { ok: false, error: "Player not in room", kicked: true };
+}
+
 export async function handleAction(
   code: string,
   msg: ActionMessage,
   auth: { hostSecret?: string; playerId?: string }
-): Promise<{ ok: boolean; error?: string; room?: Room }> {
+): Promise<ActionResult> {
   const room = await getRoom(code);
   if (!room) return { ok: false, error: "Room not found" };
 
+  const missing = playerMissing(room, auth);
+  if (missing) return missing;
+
   const isHost = !!auth.hostSecret && auth.hostSecret === room.hostSecret;
   const isPlayer = !!auth.playerId && room.players.some((p) => p.id === auth.playerId);
+  let playersTouched = false;
 
   switch (msg.type) {
     case "updateSettings": {
@@ -294,13 +333,14 @@ export async function handleAction(
       const idx = room.players.findIndex((p) => p.id === msg.targetPlayerId);
       if (idx === -1) return { ok: false, error: "Player not found" };
       room.players.splice(idx, 1);
+      playersTouched = true;
       break;
     }
 
     case "reportAudioCache": {
       if (!isPlayer) return { ok: false, error: "Players only" };
       if (!room.game.active || !activeClueHasAudio(room)) {
-        return { ok: false, error: "No audio clue active" };
+        return { ok: true, room, skipSave: true };
       }
       const percent = Math.max(0, Math.min(100, Math.round(Number(msg.percent) || 0)));
       room.game.audioCache[auth.playerId!] = {
@@ -355,6 +395,10 @@ export async function handleAction(
   }
 
   const syncMedia = msg.type === "updateSettings";
-  await saveRoom(room, { syncMedia });
+  if (playersTouched) {
+    await saveRoom(room, { syncMedia, playersTouched: true });
+  } else {
+    await saveRoom(room, { syncMedia });
+  }
   return { ok: true, room };
 }
