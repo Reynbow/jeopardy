@@ -69,13 +69,20 @@ export async function getRoom(code: string): Promise<Room | null> {
   return room;
 }
 
-export async function saveRoom(room: Room) {
-  const prev = await getStore().getRoom(room.code);
+export async function saveRoom(
+  room: Room,
+  options: { syncMedia?: boolean } = {}
+) {
   room.game = normalizeGameState(room.game);
   pruneGame(room);
   room.revision = (room.revision ?? 0) + 1;
-  await removeUnusedMedia(room.code, prev, room);
-  await syncRoomMedia(room.code, collectMediaUrls(room));
+
+  if (options.syncMedia) {
+    const prev = await getStore().getRoom(room.code);
+    await removeUnusedMedia(room.code, prev, room);
+    await syncRoomMedia(room.code, collectMediaUrls(room));
+  }
+
   await getStore().setRoom(room);
 }
 
@@ -122,6 +129,7 @@ export type ActionMessage =
   | { type: "reveal"; cat: number; row: number }
   | { type: "closeClue" }
   | { type: "buzz" }
+  | { type: "goldenBuzz" }
   | { type: "showQuestion" }
   | { type: "showAnswer" }
   | { type: "adjustScore"; index: number; delta: number }
@@ -185,6 +193,30 @@ export async function handleAction(
       break;
     }
 
+    case "goldenBuzz": {
+      if (!isPlayer) return { ok: false, error: "Players only" };
+      if (!room.settings.goldenBuzzerEnabled) {
+        return { ok: false, error: "Golden buzzer disabled" };
+      }
+      if (!room.game.active) return { ok: false, error: "No active clue" };
+      if (room.game.goldenUsed[auth.playerId!]) {
+        return { ok: false, error: "Golden buzzer already used" };
+      }
+      if (room.game.buzzes.some((b) => b.playerId === auth.playerId)) {
+        break;
+      }
+      room.game.buzzes.push({
+        playerId: auth.playerId!,
+        at: Date.now(),
+        golden: true,
+      });
+      room.game.goldenUsed[auth.playerId!] = true;
+      if (room.game.buzzes.length === 1) {
+        room.game.showQuestionToPlayers = false;
+      }
+      break;
+    }
+
     case "showQuestion": {
       if (!isHost) return { ok: false, error: "Host only" };
       if (!room.game.active) return { ok: false, error: "No active clue" };
@@ -202,7 +234,22 @@ export async function handleAction(
     case "adjustScore": {
       if (!isHost) return { ok: false, error: "Host only" };
       const p = room.players[msg.index];
-      if (p) p.score += Number(msg.delta) || 0;
+      if (p) {
+        let delta = Number(msg.delta) || 0;
+        const goldenBuzz = room.game.buzzes.some(
+          (b) => b.playerId === p.id && b.golden
+        );
+        if (goldenBuzz) {
+          delta *= 2;
+        }
+        p.score += delta;
+        if (room.game.active && delta !== 0) {
+          room.game.showQuestionToPlayers = true;
+          if (delta > 0) {
+            room.game.showAnswerToPlayers = true;
+          }
+        }
+      }
       break;
     }
 
@@ -231,6 +278,7 @@ export async function handleAction(
       if (!isHost) return { ok: false, error: "Host only" };
       room.game.revealed = {};
       room.game.active = null;
+      room.game.goldenUsed = {};
       resetClueState(room);
       room.players.forEach((p) => (p.score = 0));
       break;
@@ -270,6 +318,7 @@ export async function handleAction(
       return { ok: false, error: "Unknown action" };
   }
 
-  await saveRoom(room);
+  const syncMedia = msg.type === "updateSettings";
+  await saveRoom(room, { syncMedia });
   return { ok: true, room };
 }

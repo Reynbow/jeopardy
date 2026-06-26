@@ -1,6 +1,8 @@
 export interface Clue {
   question: string;
   answer: string;
+  /** How the clue prompt is edited: text, image, or audio. */
+  promptType?: "text" | "image" | "audio";
   /** Optional image shown with the clue (URL from upload or external link). */
   imageUrl?: string;
   /** Optional audio played with the clue (URL from upload or external link). */
@@ -17,11 +19,14 @@ export interface GameSettings {
   rows: number;
   values: number[];
   categories: Category[];
+  /** When true, each player gets one golden buzzer (2× on the clue they use it). */
+  goldenBuzzerEnabled?: boolean;
 }
 
 export interface BuzzEntry {
   playerId: string;
   at: number;
+  golden?: boolean;
 }
 
 export interface AudioCacheEntry {
@@ -41,6 +46,8 @@ export interface GameState {
   audioCache: Record<string, AudioCacheEntry>;
   /** Server timestamp (ms) when synced audio playback should start. */
   audioPlayAt: number | null;
+  /** Players who have spent their one golden buzzer this game. */
+  goldenUsed: Record<string, boolean>;
 }
 
 export interface Player {

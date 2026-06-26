@@ -2,11 +2,15 @@
   const titleInput = document.getElementById("title");
   const numCatsInput = document.getElementById("numCats");
   const numRowsInput = document.getElementById("numRows");
+  const goldenBuzzerInput = document.getElementById("goldenBuzzer");
   const rowValuesStrip = document.getElementById("rowValuesStrip");
-  const categoriesEditor = document.getElementById("categoriesEditor");
+  const boardEl = document.getElementById("categoriesEditor");
   const saveIndicator = document.getElementById("saveIndicator");
 
+  const MODES = ["text", "image", "audio"];
+
   let local = null;
+  let saveTimer = null;
 
   Game.onState((state) => {
     if (!local) {
@@ -20,16 +24,45 @@
       title: s.title || "JEOPARDY!",
       rows: s.rows,
       values: s.values.slice(),
+      goldenBuzzerEnabled: !!s.goldenBuzzerEnabled,
       categories: s.categories.map((c) => ({
         name: c.name || "",
         clues: c.clues.map((q) => ({
           question: q.question || "",
           answer: q.answer || "",
+          promptType: q.promptType || inferMode(q),
           imageUrl: q.imageUrl || "",
           audioUrl: q.audioUrl || "",
         })),
       })),
     };
+  }
+
+  function inferMode(clue) {
+    if ((clue.audioUrl || "").trim()) return "audio";
+    if ((clue.imageUrl || "").trim()) return "image";
+    return "text";
+  }
+
+  function emptyClue() {
+    return {
+      question: "",
+      answer: "",
+      promptType: "text",
+      imageUrl: "",
+      audioUrl: "",
+    };
+  }
+
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 350);
+  }
+
+  function save() {
+    Game.send({ type: "updateSettings", settings: local });
+    saveIndicator.classList.add("show");
+    setTimeout(() => saveIndicator.classList.remove("show"), 1200);
   }
 
   async function uploadMedia(file) {
@@ -48,22 +81,140 @@
     return data.url;
   }
 
-  function createMediaField(label, kind, clue, onUpdate) {
-    const field = document.createElement("div");
-    field.className = "clue-field clue-media-field";
+  function renderAll() {
+    titleInput.value = local.title;
+    numCatsInput.value = local.categories.length;
+    numRowsInput.value = local.rows;
+    if (goldenBuzzerInput) {
+      goldenBuzzerInput.checked = !!local.goldenBuzzerEnabled;
+    }
+    renderRowValues();
+    renderBoard();
+  }
 
-    const fieldLabel = document.createElement("label");
-    fieldLabel.textContent = label;
-    field.appendChild(fieldLabel);
+  function renderRowValues() {
+    rowValuesStrip.innerHTML = "";
+    const heading = document.createElement("div");
+    heading.className = "row-values-heading";
+    heading.textContent = "Row values";
+    rowValuesStrip.appendChild(heading);
 
-    const row = document.createElement("div");
-    row.className = "media-input-row";
+    for (let r = 0; r < local.rows; r++) {
+      const item = document.createElement("div");
+      item.className = "row-value-item";
+      const label = document.createElement("label");
+      label.textContent = "Row " + (r + 1);
+      const input = document.createElement("input");
+      input.type = "number";
+      input.value = local.values[r];
+      input.step = "100";
+      input.addEventListener("input", () => {
+        local.values[r] = Number(input.value) || 0;
+        boardEl
+          .querySelectorAll(`.settings-tile[data-row="${r}"] .settings-tile-value`)
+          .forEach((el) => {
+            el.textContent = "$" + local.values[r];
+          });
+        scheduleSave();
+      });
+      item.appendChild(label);
+      item.appendChild(input);
+      rowValuesStrip.appendChild(item);
+    }
+  }
+
+  function renderBoard() {
+    const cols = local.categories.length;
+    boardEl.innerHTML = "";
+    boardEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+    local.categories.forEach((cat, c) => {
+      const head = document.createElement("div");
+      head.className = "settings-cat-cell";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "settings-cat-input";
+      input.value = cat.name;
+      input.placeholder = "Category " + (c + 1);
+      input.addEventListener("input", () => {
+        local.categories[c].name = input.value;
+        scheduleSave();
+      });
+      head.appendChild(input);
+      boardEl.appendChild(head);
+    });
+
+    for (let r = 0; r < local.rows; r++) {
+      local.categories.forEach((cat, c) => {
+        boardEl.appendChild(createClueTile(c, r));
+      });
+    }
+  }
+
+  function setClueMode(c, r, mode) {
+    const clue = local.categories[c].clues[r];
+    clue.promptType = mode;
+    const tile = boardEl.querySelector(
+      `.settings-tile[data-cat="${c}"][data-row="${r}"]`
+    );
+    if (tile) {
+      updateModeButtons(tile, mode);
+      renderTileBody(tile, c, r);
+    }
+    scheduleSave();
+  }
+
+  function updateModeButtons(tile, mode) {
+    tile.querySelectorAll(".settings-mode-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.mode === mode);
+    });
+  }
+
+  function renderTileBody(tile, c, r) {
+    const clue = local.categories[c].clues[r];
+    const body = tile.querySelector(".settings-tile-body");
+    if (!body) return;
+    body.innerHTML = "";
+
+    const mode = clue.promptType || "text";
+
+    if (mode === "text") {
+      const ta = document.createElement("textarea");
+      ta.className = "settings-clue-text";
+      ta.placeholder = "Clue text";
+      ta.rows = 3;
+      ta.value = clue.question;
+      ta.addEventListener("input", () => {
+        clue.question = ta.value;
+        scheduleSave();
+      });
+      body.appendChild(ta);
+      return;
+    }
+
+    if (mode === "image") {
+      body.appendChild(createMediaEditor(c, r, "image"));
+      return;
+    }
+
+    if (mode === "audio") {
+      body.appendChild(createMediaEditor(c, r, "audio"));
+    }
+  }
+
+  function createMediaEditor(c, r, kind) {
+    const clue = local.categories[c].clues[r];
+    const wrap = document.createElement("div");
+    wrap.className = "settings-media-editor";
 
     const urlKey = kind === "image" ? "imageUrl" : "audioUrl";
     const accept =
       kind === "image"
         ? "image/jpeg,image/png,image/gif,image/webp"
         : "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4";
+
+    const row = document.createElement("div");
+    row.className = "media-input-row";
 
     const urlInput = document.createElement("input");
     urlInput.type = "url";
@@ -72,7 +223,7 @@
     urlInput.value = clue[urlKey] || "";
     urlInput.addEventListener("input", () => {
       clue[urlKey] = urlInput.value.trim();
-      onUpdate();
+      renderMediaPreview(preview, clue, kind);
       scheduleSave();
     });
 
@@ -94,7 +245,7 @@
     clearBtn.addEventListener("click", () => {
       clue[urlKey] = "";
       urlInput.value = "";
-      onUpdate();
+      renderMediaPreview(preview, clue, kind);
       scheduleSave();
     });
 
@@ -108,7 +259,7 @@
         const url = await uploadMedia(file);
         clue[urlKey] = url;
         urlInput.value = url;
-        onUpdate();
+        renderMediaPreview(preview, clue, kind);
         scheduleSave();
       } catch (err) {
         alert(err instanceof Error ? err.message : "Upload failed");
@@ -122,165 +273,87 @@
     row.appendChild(uploadBtn);
     row.appendChild(clearBtn);
     row.appendChild(fileInput);
-    field.appendChild(row);
+    wrap.appendChild(row);
 
     const preview = document.createElement("div");
     preview.className = "media-preview";
+    renderMediaPreview(preview, clue, kind);
+    wrap.appendChild(preview);
 
-    function renderPreview() {
-      preview.innerHTML = "";
-      const url = (clue[urlKey] || "").trim();
-      if (!url) return;
-      if (kind === "image") {
-        const img = document.createElement("img");
-        img.className = "clue-image-preview";
-        img.src = url;
-        img.alt = "Preview";
-        preview.appendChild(img);
-      } else {
-        const audio = document.createElement("audio");
-        audio.controls = true;
-        audio.src = url;
-        audio.className = "clue-audio-preview";
-        preview.appendChild(audio);
-      }
-    }
-
-    renderPreview();
-    field.appendChild(preview);
-
-    return { field, renderPreview };
+    return wrap;
   }
 
-  let saveTimer = null;
-  function scheduleSave() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 350);
-  }
-  function save() {
-    Game.send({ type: "updateSettings", settings: local });
-    saveIndicator.classList.add("show");
-    setTimeout(() => saveIndicator.classList.remove("show"), 1200);
-  }
-
-  function renderAll() {
-    titleInput.value = local.title;
-    numCatsInput.value = local.categories.length;
-    numRowsInput.value = local.rows;
-    renderRowValues();
-    renderCategories();
-    enableMiddleMouseScroll(rowValuesStrip);
-  }
-
-  function renderRowValues() {
-    rowValuesStrip.innerHTML = "";
-    const heading = document.createElement("div");
-    heading.className = "row-values-heading";
-    heading.textContent = "Row values";
-    rowValuesStrip.appendChild(heading);
-
-    for (let r = 0; r < local.rows; r++) {
-      const item = document.createElement("div");
-      item.className = "row-value-item";
-      const label = document.createElement("label");
-      label.textContent = "Row " + (r + 1);
-      const input = document.createElement("input");
-      input.type = "number";
-      input.value = local.values[r];
-      input.step = "100";
-      input.addEventListener("input", () => {
-        local.values[r] = Number(input.value) || 0;
-        renderCategories();
-        scheduleSave();
-      });
-      item.appendChild(label);
-      item.appendChild(input);
-      rowValuesStrip.appendChild(item);
+  function renderMediaPreview(preview, clue, kind) {
+    preview.innerHTML = "";
+    const urlKey = kind === "image" ? "imageUrl" : "audioUrl";
+    const url = (clue[urlKey] || "").trim();
+    if (!url) return;
+    if (kind === "image") {
+      const img = document.createElement("img");
+      img.className = "clue-image-preview";
+      img.src = url;
+      img.alt = "Preview";
+      preview.appendChild(img);
+    } else {
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.src = url;
+      audio.className = "clue-audio-preview";
+      preview.appendChild(audio);
     }
   }
 
-  function renderCategories() {
-    categoriesEditor.innerHTML = "";
+  function createClueTile(c, r) {
+    const clue = local.categories[c].clues[r];
+    const mode = clue.promptType || "text";
 
-    local.categories.forEach((cat, c) => {
-      const block = document.createElement("div");
-      block.className = "category-block";
+    const tile = document.createElement("div");
+    tile.className = "settings-tile";
+    tile.dataset.cat = String(c);
+    tile.dataset.row = String(r);
 
-      const head = document.createElement("div");
-      head.className = "category-block-head";
-      const num = document.createElement("span");
-      num.className = "cat-num";
-      num.textContent = "Category " + (c + 1);
-      const nameInput = document.createElement("input");
-      nameInput.type = "text";
-      nameInput.value = cat.name;
-      nameInput.placeholder = "Category name";
-      nameInput.addEventListener("input", () => {
-        local.categories[c].name = nameInput.value;
-        scheduleSave();
-      });
-      head.appendChild(num);
-      head.appendChild(nameInput);
-      block.appendChild(head);
+    const value = document.createElement("div");
+    value.className = "settings-tile-value";
+    value.textContent = "$" + local.values[r];
+    tile.appendChild(value);
 
-      const rows = document.createElement("div");
-      rows.className = "clue-rows";
-
-      for (let r = 0; r < local.rows; r++) {
-        const rowEl = document.createElement("div");
-        rowEl.className = "clue-edit-row";
-
-        const valLabel = document.createElement("div");
-        valLabel.className = "clue-value-label";
-        valLabel.textContent = "$" + local.values[r];
-
-        const qField = document.createElement("div");
-        qField.className = "clue-field";
-        const qLabel = document.createElement("label");
-        qLabel.textContent = "Question (text)";
-        const q = document.createElement("textarea");
-        q.placeholder = "Optional text shown with the clue";
-        q.value = cat.clues[r].question;
-        q.addEventListener("input", () => {
-          local.categories[c].clues[r].question = q.value;
-          scheduleSave();
-        });
-        qField.appendChild(qLabel);
-        qField.appendChild(q);
-
-        const clue = cat.clues[r];
-        const imageField = createMediaField("Image", "image", clue, () =>
-          imageField.renderPreview()
-        );
-        const audioField = createMediaField("Audio", "audio", clue, () =>
-          audioField.renderPreview()
-        );
-
-        const aField = document.createElement("div");
-        aField.className = "clue-field";
-        const aLabel = document.createElement("label");
-        aLabel.textContent = "Answer";
-        const a = document.createElement("textarea");
-        a.placeholder = "Host only";
-        a.value = cat.clues[r].answer;
-        a.addEventListener("input", () => {
-          local.categories[c].clues[r].answer = a.value;
-          scheduleSave();
-        });
-        aField.appendChild(aLabel);
-        aField.appendChild(a);
-
-        rowEl.appendChild(valLabel);
-        rowEl.appendChild(qField);
-        rowEl.appendChild(imageField.field);
-        rowEl.appendChild(audioField.field);
-        rowEl.appendChild(aField);
-        rows.appendChild(rowEl);
-      }
-
-      block.appendChild(rows);
-      categoriesEditor.appendChild(block);
+    const modeBar = document.createElement("div");
+    modeBar.className = "settings-mode-bar";
+    MODES.forEach((m) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "settings-mode-btn" + (m === mode ? " active" : "");
+      btn.dataset.mode = m;
+      btn.textContent = m === "text" ? "Text" : m === "image" ? "Image" : "Audio";
+      btn.title = "Use " + btn.textContent.toLowerCase() + " for this clue";
+      btn.addEventListener("click", () => setClueMode(c, r, m));
+      modeBar.appendChild(btn);
     });
+    tile.appendChild(modeBar);
+
+    const body = document.createElement("div");
+    body.className = "settings-tile-body";
+    tile.appendChild(body);
+
+    const answerWrap = document.createElement("div");
+    answerWrap.className = "settings-tile-answer";
+    const answerLabel = document.createElement("label");
+    answerLabel.textContent = "Answer";
+    const answer = document.createElement("textarea");
+    answer.className = "settings-answer-text";
+    answer.placeholder = "Host only";
+    answer.rows = 2;
+    answer.value = clue.answer;
+    answer.addEventListener("input", () => {
+      clue.answer = answer.value;
+      scheduleSave();
+    });
+    answerWrap.appendChild(answerLabel);
+    answerWrap.appendChild(answer);
+    tile.appendChild(answerWrap);
+
+    renderTileBody(tile, c, r);
+    return tile;
   }
 
   numCatsInput.addEventListener("change", () => {
@@ -291,12 +364,7 @@
       for (let i = cur; i < n; i++) {
         local.categories.push({
           name: "",
-          clues: Array.from({ length: local.rows }, () => ({
-            question: "",
-            answer: "",
-            imageUrl: "",
-            audioUrl: "",
-          })),
+          clues: Array.from({ length: local.rows }, () => emptyClue()),
         });
       }
     } else if (n < cur) {
@@ -313,9 +381,7 @@
     if (n > cur) {
       for (let r = cur; r < n; r++) {
         local.values.push((r + 1) * 200);
-        local.categories.forEach((cat) =>
-          cat.clues.push({ question: "", answer: "", imageUrl: "", audioUrl: "" })
-        );
+        local.categories.forEach((cat) => cat.clues.push(emptyClue()));
       }
     } else if (n < cur) {
       local.values.length = n;
@@ -331,37 +397,25 @@
     scheduleSave();
   });
 
-  function enableMiddleMouseScroll(el) {
-    if (!el || el.dataset.panBound) return;
-    el.dataset.panBound = "1";
+  goldenBuzzerInput?.addEventListener("change", () => {
+    local.goldenBuzzerEnabled = goldenBuzzerInput.checked;
+    scheduleSave();
+  });
 
-    let panning = false;
-    let startX = 0;
-    let scrollLeft = 0;
-
-    el.addEventListener("mousedown", (e) => {
-      if (e.button !== 1) return;
-      e.preventDefault();
-      panning = true;
-      startX = e.clientX;
-      scrollLeft = el.scrollLeft;
-      el.classList.add("panning");
+  function clearAllClues() {
+    if (
+      !confirm(
+        "Clear every question and answer on the board? Category names and row values will be kept."
+      )
+    ) {
+      return;
+    }
+    local.categories.forEach((cat) => {
+      cat.clues = cat.clues.map(() => emptyClue());
     });
-
-    el.addEventListener("mousemove", (e) => {
-      if (!panning) return;
-      e.preventDefault();
-      el.scrollLeft = scrollLeft - (e.clientX - startX);
-    });
-
-    const stop = () => {
-      panning = false;
-      el.classList.remove("panning");
-    };
-    el.addEventListener("mouseup", stop);
-    el.addEventListener("mouseleave", stop);
-    el.addEventListener("auxclick", (e) => {
-      if (e.button === 1) e.preventDefault();
-    });
+    renderBoard();
+    save();
   }
+
+  document.getElementById("clearAllCluesBtn")?.addEventListener("click", clearAllClues);
 })();

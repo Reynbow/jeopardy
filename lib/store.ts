@@ -48,9 +48,35 @@ function hasRedisEnv() {
 
 let store: Store | null = null;
 
+function cloneRoom(room: Room): Room {
+  return JSON.parse(JSON.stringify(room)) as Room;
+}
+
+/** In-process read-through cache — avoids a Redis round-trip per poll on warm instances. */
+function cachedStore(inner: Store): Store {
+  const g = globalThis as unknown as { __jeopardyRoomCache?: Map<string, Room> };
+  if (!g.__jeopardyRoomCache) g.__jeopardyRoomCache = new Map();
+  const cache = g.__jeopardyRoomCache;
+
+  return {
+    async getRoom(code) {
+      const hit = cache.get(code);
+      if (hit) return cloneRoom(hit);
+      const data = await inner.getRoom(code);
+      if (data) cache.set(code, cloneRoom(data));
+      return data;
+    },
+    async setRoom(room) {
+      cache.set(room.code, cloneRoom(room));
+      await inner.setRoom(room);
+    },
+  };
+}
+
 export function getStore(): Store {
   if (!store) {
-    store = hasRedisEnv() ? redisStore() : memoryStore();
+    const base = hasRedisEnv() ? redisStore() : memoryStore();
+    store = cachedStore(base);
   }
   return store;
 }

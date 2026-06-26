@@ -13,6 +13,7 @@
 
   function render(state) {
     const { settings, game } = state;
+    if (window.ScoreEffects) ScoreEffects.trackScores(state);
     document.title = (settings.title || "Jeopardy") + " — Host";
 
     const cols = settings.categories.length;
@@ -54,6 +55,7 @@
     renderAnswer(state);
     renderScores(state);
     renderBuzzPanel(state);
+    renderGoldenDoubleBanner(state);
     renderAudioHostPanel(state);
     updateShowQuestionBtn(state);
     updateShowAnswerBtn(state);
@@ -73,6 +75,10 @@
     const active = !!state.game.active;
     btn.style.display = active ? "inline-block" : "none";
     btn.disabled = !active || !!state.game.showAnswerToPlayers;
+  }
+
+  function hasGoldenBuzz(state) {
+    return (state.game.buzzes || []).some((b) => b.golden);
   }
 
   function renderBuzzPanel(state) {
@@ -97,18 +103,56 @@
     buzzes.forEach((b, i) => {
       const p = players.find((pl) => pl.id === b.playerId);
       const row = document.createElement("div");
-      row.className = "buzz-list-row" + (i === 0 ? " first" : "");
+      row.className =
+        "buzz-list-row" +
+        (i === 0 ? " first" : "") +
+        (b.golden ? " golden" : "");
       const name = document.createElement("span");
-      name.textContent = p ? p.name : "Unknown";
+      name.textContent = (p ? p.name : "Unknown") + (b.golden ? " ★" : "");
       const time = document.createElement("span");
       time.className = "buzz-list-time";
-      time.textContent = i === 0 ? "1st" : formatDelay(b.at - first.at);
+      time.textContent =
+        i === 0
+          ? b.golden
+            ? "1st · GOLD"
+            : "1st"
+          : formatDelay(b.at - first.at) + (b.golden ? " · GOLD" : "");
       row.appendChild(name);
       row.appendChild(time);
       list.appendChild(row);
     });
 
     panel.appendChild(list);
+  }
+
+  function hasGoldenBuzz(state, playerId) {
+    return (state.game.buzzes || []).some(
+      (b) => b.playerId === playerId && b.golden
+    );
+  }
+
+  function renderGoldenDoubleBanner(state) {
+    const banner = document.getElementById("goldenDoubleBanner");
+    if (!banner) return;
+
+    const buzzes = state.game.buzzes || [];
+    const goldenBuzzes = buzzes.filter((b) => b.golden);
+    if (!goldenBuzzes.length || !state.game.active) {
+      banner.style.display = "none";
+      banner.textContent = "";
+      return;
+    }
+
+    const players = state.players || [];
+    const names = goldenBuzzes
+      .map((b) => players.find((p) => p.id === b.playerId)?.name || "Unknown")
+      .filter((n, i, arr) => arr.indexOf(n) === i);
+
+    banner.style.display = "block";
+    banner.textContent =
+      names.length === 1
+        ? `${names[0]} earns 2× if scored on this clue`
+        : `${names.join(", ")} earn 2× if scored on this clue`;
   }
 
   function renderAudioHostPanel(state) {
@@ -184,6 +228,7 @@
     if (!active) {
       lastAnswerKey = "";
       ClueAudio.teardown();
+      answerBox.classList.remove("golden-buzz");
       answerBox.innerHTML =
         '<div class="ab-empty">No clue selected. Click a tile on the board (here or on the main screen).</div>';
       return;
@@ -192,14 +237,18 @@
     const clue = cat && cat.clues[active.row];
     if (!clue) {
       lastAnswerKey = "";
+      answerBox.classList.remove("golden-buzz");
       answerBox.innerHTML = '<div class="ab-empty">Clue unavailable.</div>';
       return;
     }
+
+    answerBox.classList.toggle("golden-buzz", hasGoldenBuzz(state));
 
     const key = `${active.cat}-${active.row}`;
     const isAudio = ClueAudio.isAudioClue(clue);
 
     if (isAudio && key === lastAnswerKey && answerBox.querySelector(".ab-q")) {
+      answerBox.classList.toggle("golden-buzz", hasGoldenBuzz(state));
       const q = answerBox.querySelector(".ab-q");
       const countdown = answerBox.querySelector(".audio-countdown");
       ClueAudio.handleState(state, q, countdown, { isHost: true });
@@ -264,15 +313,21 @@
       buttons.className = "score-buttons";
 
       if (active && val) {
+        const isDouble = hasGoldenBuzz(state, c.id);
+        const displayVal = isDouble ? val * 2 : val;
         const correct = document.createElement("button");
-        correct.className = "btn small correct";
-        correct.textContent = "+$" + val;
-        correct.title = "Correct answer";
+        correct.className = "btn small correct" + (isDouble ? " golden-double" : "");
+        correct.textContent = "+$" + displayVal;
+        correct.title = isDouble
+          ? "Correct answer (golden 2×)"
+          : "Correct answer";
 
         const wrong = document.createElement("button");
-        wrong.className = "btn small wrong";
-        wrong.textContent = "-$" + val;
-        wrong.title = "Wrong answer";
+        wrong.className = "btn small wrong" + (isDouble ? " golden-double" : "");
+        wrong.textContent = "-$" + displayVal;
+        wrong.title = isDouble
+          ? "Wrong answer (golden 2×)"
+          : "Wrong answer";
 
         buttons.appendChild(correct);
         buttons.appendChild(wrong);
@@ -290,6 +345,8 @@
 
       scoresEl.appendChild(row);
     });
+
+    if (window.ScoreEffects) ScoreEffects.flush(scoresEl);
   }
 
   boardEl.addEventListener("click", (e) => {

@@ -4,6 +4,7 @@
   const buzzerDock = document.getElementById("buzzerDock");
   const playBottom = document.getElementById("playBottom");
   const overlay = document.getElementById("overlay");
+  const clueCard = document.getElementById("clueCard");
   const clueMeta = document.getElementById("clueMeta");
   const clueText = document.getElementById("clueText");
   const clueAnswer = document.getElementById("clueAnswer");
@@ -11,27 +12,80 @@
 
   const isPlayer = RoomSession.isPlayer();
   const myId = RoomSession.getPlayerId();
+  let latestState = null;
   let lastBuzzerKey = "";
+  let lastClueKey = "";
+  let pendingBuzz = null;
+  const celebratedGoldenBuzzes = new Set();
+
+  function fireGoldenConfetti() {
+    if (window.GoldenConfetti) {
+      window.GoldenConfetti.burst();
+    }
+  }
 
   Game.onState((state) => {
+    latestState = state;
+    checkGoldenConfetti(state);
     render(state);
   });
 
+  function checkGoldenConfetti(state) {
+    const active = state.game.active;
+    if (!active) {
+      lastClueKey = "";
+      celebratedGoldenBuzzes.clear();
+      return;
+    }
+
+    const clueKey = `${active.cat}-${active.row}`;
+    if (clueKey !== lastClueKey) {
+      lastClueKey = clueKey;
+      celebratedGoldenBuzzes.clear();
+    }
+
+    const buzzes = state.game.buzzes || [];
+    buzzes.forEach((b) => {
+      if (!b.golden) return;
+      const key = `${clueKey}:${b.playerId}:${b.at}`;
+      if (celebratedGoldenBuzzes.has(key)) return;
+      celebratedGoldenBuzzes.add(key);
+      fireGoldenConfetti();
+    });
+  }
+
   if (buzzerDock) {
     buzzerDock.addEventListener("click", (e) => {
+      const goldenBtn = e.target.closest(".golden-buzzer-btn");
+      if (goldenBtn && !goldenBtn.disabled) {
+        goldenBtn.disabled = true;
+        pendingBuzz = "golden";
+        if (latestState) renderBuzzerDock(latestState);
+        Game.send({ type: "goldenBuzz" });
+        return;
+      }
       const btn = e.target.closest(".buzzer-btn");
       if (!btn || btn.disabled) return;
       btn.disabled = true;
+      pendingBuzz = "buzz";
+      if (latestState) renderBuzzerDock(latestState);
       Game.send({ type: "buzz" });
     });
   }
 
   function render(state) {
     const { settings, game } = state;
+    if (window.ScoreEffects) ScoreEffects.trackScores(state);
     document.title = (settings.title || "Jeopardy") + " — Board";
 
     const cols = settings.categories.length;
+    const isPlayLayout = !!document.querySelector(".play-layout");
     boardEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    if (isPlayLayout) {
+      boardEl.style.gridTemplateRows = `minmax(56px, 1fr) repeat(${settings.rows}, 1fr)`;
+    } else {
+      boardEl.style.gridTemplateRows = "";
+    }
     boardEl.innerHTML = "";
 
     settings.categories.forEach((cat) => {
@@ -80,6 +134,7 @@
     players.forEach((c) => {
       const box = document.createElement("div");
       box.className = "contestant";
+      box.dataset.playerId = c.id;
 
       const buzzIdx = buzzes.findIndex((b) => b.playerId === c.id);
       const buzz = buzzIdx >= 0 ? buzzes[buzzIdx] : null;
@@ -87,6 +142,7 @@
       if (buzz) {
         box.classList.add("buzzed");
         if (buzzIdx === 0) box.classList.add("buzz-first");
+        if (buzz.golden) box.classList.add("buzz-golden");
       }
 
       const name = document.createElement("div");
@@ -102,17 +158,21 @@
 
       if (buzz && firstBuzz) {
         const tag = document.createElement("div");
-        tag.className = "buzz-tag";
+        tag.className = "buzz-tag" + (buzz.golden ? " golden" : "");
         if (buzzIdx === 0) {
-          tag.textContent = "FIRST!";
+          tag.textContent = buzz.golden ? "FIRST! (GOLD)" : "FIRST!";
         } else {
-          tag.textContent = formatDelay(buzz.at - firstBuzz.at);
+          tag.textContent =
+            formatDelay(buzz.at - firstBuzz.at) +
+            (buzz.golden ? " · GOLD" : "");
         }
         box.appendChild(tag);
       }
 
       contestantsEl.appendChild(box);
     });
+
+    if (window.ScoreEffects) ScoreEffects.flush(contestantsEl);
   }
 
   function renderBuzzerDock(state) {
@@ -121,7 +181,16 @@
     const active = !!state.game.active;
     const buzzes = state.game.buzzes || [];
     const myBuzzIdx = buzzes.findIndex((b) => b.playerId === myId);
-    const buzzerKey = `${active}:${myBuzzIdx}:${buzzes.length}`;
+
+    if (!active) {
+      pendingBuzz = null;
+    } else if (myBuzzIdx >= 0) {
+      pendingBuzz = null;
+    }
+
+    const goldenEnabled = !!state.settings.goldenBuzzerEnabled;
+    const goldenSpent = !!(state.game.goldenUsed && state.game.goldenUsed[myId]);
+    const buzzerKey = `${active}:${myBuzzIdx}:${buzzes.length}:${goldenEnabled}:${goldenSpent}:${pendingBuzz}`;
     if (buzzerKey === lastBuzzerKey) return;
     lastBuzzerKey = buzzerKey;
 
@@ -136,18 +205,46 @@
       const status = document.createElement("div");
       status.className =
         "buzzer-status" + (myBuzzIdx === 0 ? " first" : "");
-      status.textContent =
+      let msg =
         myBuzzIdx === 0
           ? "You buzzed in first!"
           : "You buzzed " + formatDelay(myBuzz.at - firstBuzz.at) + " later";
+      if (myBuzz.golden) {
+        msg += " Golden buzzer — 2× if you score on this clue!";
+      }
+      status.textContent = msg;
       buzzerDock.appendChild(status);
       return;
+    }
+
+    if (pendingBuzz) {
+      const status = document.createElement("div");
+      status.className = "buzzer-status";
+      status.textContent =
+        pendingBuzz === "golden"
+          ? "Golden buzz sent…"
+          : "Buzz sent…";
+      buzzerDock.appendChild(status);
+      return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "buzzer-buttons";
+
+    if (goldenEnabled && !goldenSpent) {
+      const goldenBtn = document.createElement("button");
+      goldenBtn.className = "btn golden-buzzer-btn";
+      goldenBtn.textContent = "GOLD!";
+      goldenBtn.title = "One-time use — doubles your points on this clue if scored";
+      row.appendChild(goldenBtn);
     }
 
     const buzzBtn = document.createElement("button");
     buzzBtn.className = "btn buzzer-btn";
     buzzBtn.textContent = "BUZZ!";
-    buzzerDock.appendChild(buzzBtn);
+    row.appendChild(buzzBtn);
+
+    buzzerDock.appendChild(row);
   }
 
   function renderOverlay(state) {
@@ -155,6 +252,7 @@
     if (!active) {
       ClueAudio.teardown();
       overlay.classList.remove("show");
+      clueCard?.classList.remove("golden-buzz");
       playBottom?.classList.remove("has-clue");
       if (audioCountdown) audioCountdown.classList.remove("show");
       return;
@@ -164,9 +262,13 @@
     if (!clue) {
       ClueAudio.teardown();
       overlay.classList.remove("show");
+      clueCard?.classList.remove("golden-buzz");
       playBottom?.classList.remove("has-clue");
       return;
     }
+
+    const goldenBuzz = (state.game.buzzes || []).some((b) => b.golden);
+    clueCard?.classList.toggle("golden-buzz", goldenBuzz);
 
     clueMeta.textContent = `${cat.name || ""} — $${state.settings.values[active.row] ?? 0}`;
 

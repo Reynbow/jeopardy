@@ -60,6 +60,7 @@ export default function HostPage() {
                 main screen).
               </div>
             </div>
+            <div className="golden-double-banner" id="goldenDoubleBanner" style={{ display: "none" }} />
             <div className="buzz-panel" id="buzzPanel" style={{ display: "none" }} />
             <div className="audio-host-panel" id="audioHostPanel" style={{ display: "none" }}>
               <h3>Audio clue</h3>

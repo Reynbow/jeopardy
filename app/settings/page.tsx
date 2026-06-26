@@ -19,37 +19,50 @@ export default function SettingsPage() {
       </div>
 
       <div className="settings-wrap">
-        <div className="section">
+        <div className="section settings-setup">
           <h2>Game setup</h2>
-          <div className="settings-grid">
-            <div className="field">
-              <label htmlFor="title">Game title</label>
-              <input type="text" id="title" />
+          <div className="settings-setup-top">
+            <div className="settings-setup-fields">
+              <div className="field field-title">
+                <label htmlFor="title">Game title</label>
+                <input type="text" id="title" />
+              </div>
+              <div className="field field-compact">
+                <label htmlFor="numCats">Categories</label>
+                <input type="number" id="numCats" min={1} max={12} />
+              </div>
+              <div className="field field-compact">
+                <label htmlFor="numRows">Rows</label>
+                <input type="number" id="numRows" min={1} max={10} />
+              </div>
+              <div className="field field-checkbox">
+                <label className="checkbox-label" htmlFor="goldenBuzzer">
+                  <input type="checkbox" id="goldenBuzzer" />
+                  Golden buzzer
+                </label>
+                <span className="field-hint">
+                  One per player — 2× on the clue they golden-buzz
+                </span>
+              </div>
             </div>
-            <div className="field">
-              <label htmlFor="numCats">Categories (columns)</label>
-              <input type="number" id="numCats" min={1} max={12} />
-            </div>
-            <div className="field">
-              <label htmlFor="numRows">Rows</label>
-              <input type="number" id="numRows" min={1} max={10} />
+            <div className="row-values-strip" id="rowValuesStrip" />
+            <div className="settings-setup-actions">
+              <button className="btn danger" id="clearAllCluesBtn" type="button">
+                Clear all clues
+              </button>
             </div>
           </div>
           <p className="hint">
-            Changes save automatically and update the board live. Players join
-            with a name — they appear on the board automatically. Each row shares
-            one dollar value (set in the strip below).
+            Changes save automatically. Click a tile to edit its clue — switch
+            between text, image, or audio for each question. Answers are host-only.
           </p>
         </div>
 
-        <div className="section">
-          <h2>Categories, questions &amp; answers</h2>
-          <p className="hint">
-            Each clue can use text, an image, audio, or any combination. Upload
-            files or paste a URL. The answer is shown only on the host screen.
-          </p>
-          <div className="row-values-strip scroll-pan-x" id="rowValuesStrip" />
-          <div className="categories-editor" id="categoriesEditor" />
+        <div className="section settings-board-section">
+          <h2>Board editor</h2>
+          <div className="settings-board-scroll">
+            <div className="settings-board" id="categoriesEditor" />
+          </div>
         </div>
       </div>
 

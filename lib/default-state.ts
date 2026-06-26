@@ -70,6 +70,7 @@ export function defaultGame() {
     showAnswerToPlayers: false,
     audioCache: {} as Record<string, { percent: number; ready: boolean }>,
     audioPlayAt: null as number | null,
+    goldenUsed: {} as Record<string, boolean>,
   };
 }
 
@@ -87,6 +88,8 @@ export function normalizeGameState(
     g.audioCache && typeof g.audioCache === "object" ? g.audioCache : {};
   g.audioPlayAt =
     typeof g.audioPlayAt === "number" ? g.audioPlayAt : null;
+  g.goldenUsed =
+    g.goldenUsed && typeof g.goldenUsed === "object" ? g.goldenUsed : {};
   return g;
 }
 
@@ -97,6 +100,7 @@ export function normalizeSettings(settings: Partial<GameSettings>): GameSettings
     rows: Math.max(1, Math.min(10, parseInt(String(settings.rows), 10) || base.rows)),
     values: Array.isArray(settings.values) ? settings.values.slice() : base.values.slice(),
     categories: Array.isArray(settings.categories) ? settings.categories : base.categories,
+    goldenBuzzerEnabled: !!settings.goldenBuzzerEnabled,
   };
 
   st.values = Array.from({ length: st.rows }, (_, i) =>
@@ -140,5 +144,9 @@ export function pruneGame(room: Room) {
   const cache = room.game.audioCache || {};
   room.game.audioCache = Object.fromEntries(
     Object.entries(cache).filter(([id]) => ids.has(id))
+  );
+  const goldenUsed = room.game.goldenUsed || {};
+  room.game.goldenUsed = Object.fromEntries(
+    Object.entries(goldenUsed).filter(([id]) => ids.has(id))
   );
 }

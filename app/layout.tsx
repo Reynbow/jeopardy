@@ -22,6 +22,8 @@ export default function RootLayout({
         <Script src="/js/clue-media.js" strategy="beforeInteractive" />
         <Script src="/js/clue-audio.js" strategy="beforeInteractive" />
         <Script src="/js/connection.js" strategy="beforeInteractive" />
+        <Script src="/js/golden-confetti.js" strategy="beforeInteractive" />
+        <Script src="/js/score-effects.js" strategy="beforeInteractive" />
       </body>
     </html>
   );

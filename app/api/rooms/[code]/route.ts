@@ -22,6 +22,10 @@ export async function GET(
   const url = new URL(req.url);
   const hostSecret = url.searchParams.get("hostSecret") || undefined;
   const playerId = url.searchParams.get("playerId") || undefined;
+  const sinceRaw = url.searchParams.get("since");
+  const sinceRev =
+    sinceRaw !== null && sinceRaw !== "" ? parseInt(sinceRaw, 10) : null;
+
   const isHost = !!hostSecret && hostSecret === room.hostSecret;
   const isPlayer = !!playerId && room.players.some((p) => p.id === playerId);
 
@@ -40,6 +44,20 @@ export async function GET(
       code: room.code,
       title: room.settings.title,
       playerCount: room.players.length,
+    });
+  }
+
+  const revision = room.revision ?? 0;
+  if (
+    sinceRev !== null &&
+    Number.isFinite(sinceRev) &&
+    sinceRev >= 0 &&
+    sinceRev === revision
+  ) {
+    return NextResponse.json({
+      unchanged: true,
+      revision,
+      serverTime: Date.now(),
     });
   }
 
