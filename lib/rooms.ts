@@ -73,11 +73,11 @@ export async function getRoom(code: string): Promise<Room | null> {
 }
 
 function mergePlayerLists(fresh: Player[], local: Player[]): Player[] {
-  const byId = new Map(fresh.map((p) => [p.id, p]));
+  const merged = new Map(fresh.map((p) => [p.id, p]));
   for (const p of local) {
-    if (!byId.has(p.id)) byId.set(p.id, p);
+    merged.set(p.id, p);
   }
-  return Array.from(byId.values());
+  return Array.from(merged.values());
 }
 
 export async function saveRoom(
@@ -151,7 +151,7 @@ export type ActionMessage =
   | { type: "goldenBuzz" }
   | { type: "showQuestion" }
   | { type: "showAnswer" }
-  | { type: "adjustScore"; index: number; delta: number }
+  | { type: "adjustScore"; index: number; delta: number; playerId?: string }
   | { type: "setScore"; index: number; value: number }
   | { type: "resetScores" }
   | { type: "resetGame" }
@@ -275,7 +275,10 @@ export async function handleAction(
 
     case "adjustScore": {
       if (!isHost) return { ok: false, error: "Host only" };
-      const p = room.players[msg.index];
+      const p =
+        typeof msg.playerId === "string"
+          ? room.players.find((pl) => pl.id === msg.playerId)
+          : room.players[msg.index];
       if (p) {
         let delta = Number(msg.delta) || 0;
         const goldenBuzz = room.game.buzzes.some(

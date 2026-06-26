@@ -77,7 +77,13 @@
     btn.disabled = !active || !!state.game.showAnswerToPlayers;
   }
 
-  function hasGoldenBuzz(state) {
+  function hasGoldenBuzzForPlayer(state, playerId) {
+    return (state.game.buzzes || []).some(
+      (b) => b.playerId === playerId && b.golden
+    );
+  }
+
+  function hasAnyGoldenBuzz(state) {
     return (state.game.buzzes || []).some((b) => b.golden);
   }
 
@@ -126,9 +132,7 @@
   }
 
   function hasGoldenBuzz(state, playerId) {
-    return (state.game.buzzes || []).some(
-      (b) => b.playerId === playerId && b.golden
-    );
+    return hasGoldenBuzzForPlayer(state, playerId);
   }
 
   function renderGoldenDoubleBanner(state) {
@@ -252,13 +256,13 @@
       return;
     }
 
-    answerBox.classList.toggle("golden-buzz", hasGoldenBuzz(state));
+    answerBox.classList.toggle("golden-buzz", hasAnyGoldenBuzz(state));
 
     const key = `${active.cat}-${active.row}`;
     const isAudio = ClueAudio.isAudioClue(clue);
 
     if (isAudio && key === lastAnswerKey && answerBox.querySelector(".ab-q")) {
-      answerBox.classList.toggle("golden-buzz", hasGoldenBuzz(state));
+      answerBox.classList.toggle("golden-buzz", hasAnyGoldenBuzz(state));
       const q = answerBox.querySelector(".ab-q");
       const countdown = answerBox.querySelector(".audio-countdown");
       ClueAudio.handleState(state, q, countdown, { isHost: true });
@@ -386,9 +390,9 @@
     const active = latest?.game.active;
     const val = active ? latest.settings.values[active.row] ?? 0 : 0;
     if (e.target.closest(".btn.correct")) {
-      Game.send({ type: "adjustScore", index, delta: val });
+      Game.send({ type: "adjustScore", index, playerId, delta: val });
     } else if (e.target.closest(".btn.wrong")) {
-      Game.send({ type: "adjustScore", index, delta: -val });
+      Game.send({ type: "adjustScore", index, playerId, delta: -val });
     }
   });
 
