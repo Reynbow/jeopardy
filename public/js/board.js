@@ -29,8 +29,54 @@
   Game.onState((state) => {
     latestState = state;
     checkGoldenConfetti(state);
+    preloadBoardMedia(state.settings);
     render(state);
   });
+
+  // Warm the browser cache for every clue's media so there's no load delay
+  // when the host reveals a clue. Deduped by URL, so it's cheap to call on
+  // every state update (also catches media added while waiting in the lobby).
+  const preloadedUrls = new Set();
+  const preloadHold = [];
+
+  function isYouTubeUrl(url) {
+    return !!(window.YouTubeAudio && YouTubeAudio.isYouTubeUrl(url));
+  }
+
+  function preloadImage(url) {
+    if (!url || preloadedUrls.has(url)) return;
+    preloadedUrls.add(url);
+    const img = new Image();
+    img.decoding = "async";
+    img.src = url;
+    preloadHold.push(img);
+  }
+
+  function preloadAudio(url) {
+    if (!url || preloadedUrls.has(url) || isYouTubeUrl(url)) return;
+    preloadedUrls.add(url);
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.src = url;
+    try {
+      audio.load();
+    } catch {
+      /* ignore */
+    }
+    preloadHold.push(audio);
+  }
+
+  function preloadBoardMedia(settings) {
+    if (!settings || !Array.isArray(settings.categories)) return;
+    settings.categories.forEach((cat) => {
+      (cat.clues || []).forEach((clue) => {
+        if (!clue) return;
+        preloadImage((clue.imageUrl || "").trim());
+        preloadImage((clue.imageUrl2 || "").trim());
+        preloadAudio((clue.audioUrl || "").trim());
+      });
+    });
+  }
 
   function checkGoldenConfetti(state) {
     const active = state.game.active;
