@@ -10,8 +10,10 @@ export function normalizeClue(c: Partial<Clue> | undefined): Clue {
     clue.promptType = promptType;
   }
   const imageUrl = typeof c?.imageUrl === "string" ? c.imageUrl.trim() : "";
+  const imageUrl2 = typeof c?.imageUrl2 === "string" ? c.imageUrl2.trim() : "";
   const audioUrl = typeof c?.audioUrl === "string" ? c.audioUrl.trim() : "";
   if (imageUrl) clue.imageUrl = imageUrl;
+  if (imageUrl2) clue.imageUrl2 = imageUrl2;
   if (audioUrl) clue.audioUrl = audioUrl;
   if (!clue.promptType) {
     if (audioUrl) clue.promptType = "audio";
@@ -25,6 +27,7 @@ export function clueHasContent(clue: Clue): boolean {
   return !!(
     clue.question?.trim() ||
     clue.imageUrl?.trim() ||
+    clue.imageUrl2?.trim() ||
     clue.audioUrl?.trim()
   );
 }

@@ -68,6 +68,7 @@ export function defaultGame() {
     buzzes: [] as { playerId: string; at: number }[],
     showQuestionToPlayers: true,
     showAnswerToPlayers: false,
+    activeImageIndex: 0,
     audioCache: {} as Record<string, { percent: number; ready: boolean }>,
     audioPlayAt: null as number | null,
     audioPaused: false,
@@ -87,6 +88,7 @@ export function normalizeGameState(
     : [];
   g.showQuestionToPlayers = g.showQuestionToPlayers !== false;
   g.showAnswerToPlayers = !!g.showAnswerToPlayers;
+  g.activeImageIndex = g.activeImageIndex === 1 ? 1 : 0;
   g.audioCache =
     g.audioCache && typeof g.audioCache === "object" ? g.audioCache : {};
   g.audioPlayAt =

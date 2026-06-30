@@ -27,6 +27,7 @@ function resetClueState(room: Room) {
   room.game.buzzes = [];
   room.game.showQuestionToPlayers = true;
   room.game.showAnswerToPlayers = false;
+  room.game.activeImageIndex = 0;
   room.game.audioCache = {};
   room.game.audioPlayAt = null;
   room.game.audioPaused = false;
@@ -39,6 +40,13 @@ function activeClueHasAudio(room: Room): boolean {
   if (!active) return false;
   const clue = room.settings.categories[active.cat]?.clues[active.row];
   return !!((clue?.audioUrl || "").trim());
+}
+
+function activeClueHasSecondImage(room: Room): boolean {
+  const active = room.game.active;
+  if (!active) return false;
+  const clue = room.settings.categories[active.cat]?.clues[active.row];
+  return !!((clue?.imageUrl || "").trim()) && !!((clue?.imageUrl2 || "").trim());
 }
 
 export async function createRoom(): Promise<{ code: string; hostSecret: string }> {
@@ -151,6 +159,7 @@ export type ActionMessage =
   | { type: "goldenBuzz" }
   | { type: "showQuestion" }
   | { type: "showAnswer" }
+  | { type: "setActiveImage"; index: number }
   | { type: "adjustScore"; index: number; delta: number; playerId?: string }
   | { type: "setScore"; index: number; value: number }
   | { type: "resetScores" }
@@ -270,6 +279,17 @@ export async function handleAction(
       if (!isHost) return { ok: false, error: "Host only" };
       if (!room.game.active) return { ok: false, error: "No active clue" };
       room.game.showAnswerToPlayers = true;
+      break;
+    }
+
+    case "setActiveImage": {
+      if (!isHost) return { ok: false, error: "Host only" };
+      if (!room.game.active) return { ok: false, error: "No active clue" };
+      const index = msg.index === 1 ? 1 : 0;
+      if (index === 1 && !activeClueHasSecondImage(room)) {
+        return { ok: false, error: "No second image" };
+      }
+      room.game.activeImageIndex = index;
       break;
     }
 

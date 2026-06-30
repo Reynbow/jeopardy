@@ -5,6 +5,8 @@ export interface Clue {
   promptType?: "text" | "image" | "audio";
   /** Optional image shown with the clue (URL from upload or external link). */
   imageUrl?: string;
+  /** Optional second image the host can switch to during the clue. */
+  imageUrl2?: string;
   /** Optional audio or YouTube link played with the clue (audio only in game). */
   audioUrl?: string;
 }
@@ -40,6 +42,8 @@ export interface GameState {
   buzzes: BuzzEntry[];
   /** When false, players cannot see the clue question text (after a buzz). */
   showQuestionToPlayers: boolean;
+  /** Which image of an image clue is currently shown (0 = default, 1 = second). */
+  activeImageIndex?: number;
   /** When true, players can see the answer on the question screen. */
   showAnswerToPlayers: boolean;
   /** Per-player audio preload progress for the active audio clue. */

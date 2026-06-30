@@ -39,6 +39,7 @@ export function collectMediaUrls(room: Room): string[] {
   for (const cat of room.settings.categories) {
     for (const clue of cat.clues) {
       if (clue.imageUrl?.trim()) urls.add(clue.imageUrl.trim());
+      if (clue.imageUrl2?.trim()) urls.add(clue.imageUrl2.trim());
       if (clue.audioUrl?.trim()) urls.add(clue.audioUrl.trim());
     }
   }

@@ -67,6 +67,7 @@
           answer: q.answer || "",
           promptType: q.promptType || inferMode(q),
           imageUrl: q.imageUrl || "",
+          imageUrl2: q.imageUrl2 || "",
           audioUrl: q.audioUrl || "",
         })),
       })),
@@ -85,6 +86,7 @@
       answer: "",
       promptType: "text",
       imageUrl: "",
+      imageUrl2: "",
       audioUrl: "",
     };
   }
@@ -200,6 +202,7 @@
     if (mode === "text") {
       clue.question = drafts.text;
       clue.imageUrl = "";
+      clue.imageUrl2 = "";
       clue.audioUrl = "";
     } else if (mode === "image") {
       clue.question = drafts.imageCaption;
@@ -207,6 +210,7 @@
     } else if (mode === "audio") {
       clue.question = drafts.audioCaption;
       clue.imageUrl = "";
+      clue.imageUrl2 = "";
     }
 
     const tile = boardEl.querySelector(
@@ -258,12 +262,18 @@
     }
   }
 
-  function createMediaEditor(c, r, kind) {
+  function createMediaSlot(c, r, kind, urlKey, labelText) {
     const clue = local.categories[c].clues[r];
-    const wrap = document.createElement("div");
-    wrap.className = "settings-media-editor";
+    const slot = document.createElement("div");
+    slot.className = "settings-media-slot";
 
-    const urlKey = kind === "image" ? "imageUrl" : "audioUrl";
+    if (labelText) {
+      const label = document.createElement("label");
+      label.className = "settings-media-slot-label";
+      label.textContent = labelText;
+      slot.appendChild(label);
+    }
+
     const accept =
       kind === "image"
         ? "image/jpeg,image/png,image/gif,image/webp"
@@ -278,9 +288,13 @@
     urlInput.placeholder =
       kind === "image" ? "Image URL" : "Audio or YouTube URL";
     urlInput.value = clue[urlKey] || "";
+
+    const preview = document.createElement("div");
+    preview.className = "media-preview";
+
     urlInput.addEventListener("input", () => {
       clue[urlKey] = urlInput.value.trim();
-      renderMediaPreview(preview, clue, kind);
+      renderMediaPreview(preview, clue[urlKey], kind);
       scheduleSave();
     });
 
@@ -302,7 +316,7 @@
     clearBtn.addEventListener("click", () => {
       clue[urlKey] = "";
       urlInput.value = "";
-      renderMediaPreview(preview, clue, kind);
+      renderMediaPreview(preview, clue[urlKey], kind);
       scheduleSave();
     });
 
@@ -316,7 +330,7 @@
         const url = await uploadMedia(file);
         clue[urlKey] = url;
         urlInput.value = url;
-        renderMediaPreview(preview, clue, kind);
+        renderMediaPreview(preview, clue[urlKey], kind);
         scheduleSave();
       } catch (err) {
         alert(err instanceof Error ? err.message : "Upload failed");
@@ -330,12 +344,29 @@
     row.appendChild(uploadBtn);
     row.appendChild(clearBtn);
     row.appendChild(fileInput);
-    wrap.appendChild(row);
+    slot.appendChild(row);
 
-    const preview = document.createElement("div");
-    preview.className = "media-preview";
-    renderMediaPreview(preview, clue, kind);
-    wrap.appendChild(preview);
+    renderMediaPreview(preview, clue[urlKey], kind);
+    slot.appendChild(preview);
+
+    return slot;
+  }
+
+  function createMediaEditor(c, r, kind) {
+    const clue = local.categories[c].clues[r];
+    const wrap = document.createElement("div");
+    wrap.className = "settings-media-editor";
+
+    if (kind === "image") {
+      wrap.appendChild(
+        createMediaSlot(c, r, "image", "imageUrl", "Image 1 (default)")
+      );
+      wrap.appendChild(
+        createMediaSlot(c, r, "image", "imageUrl2", "Image 2 (optional)")
+      );
+    } else {
+      wrap.appendChild(createMediaSlot(c, r, "audio", "audioUrl", ""));
+    }
 
     const captionWrap = document.createElement("div");
     captionWrap.className = "settings-media-caption-wrap";
@@ -363,10 +394,9 @@
     return wrap;
   }
 
-  function renderMediaPreview(preview, clue, kind) {
+  function renderMediaPreview(preview, value, kind) {
     preview.innerHTML = "";
-    const urlKey = kind === "image" ? "imageUrl" : "audioUrl";
-    const url = (clue[urlKey] || "").trim();
+    const url = (value || "").trim();
     if (!url) return;
     if (kind === "image") {
       const img = document.createElement("img");

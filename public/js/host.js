@@ -57,6 +57,7 @@
     renderBuzzPanel(state);
     renderGoldenDoubleBanner(state);
     renderAudioHostPanel(state);
+    renderImageHostPanel(state);
     updateShowQuestionBtn(state);
     updateShowAnswerBtn(state);
   }
@@ -232,6 +233,35 @@
     }
   }
 
+  function renderImageHostPanel(state) {
+    const panel = document.getElementById("imageHostPanel");
+    const btn1 = document.getElementById("showImage1Btn");
+    const btn2 = document.getElementById("showImage2Btn");
+    if (!panel) return;
+
+    const active = state.game.active;
+    let clue = null;
+    if (active) {
+      const cat = state.settings.categories[active.cat];
+      clue = cat && cat.clues[active.row];
+    }
+
+    const hasTwoImages =
+      !!clue &&
+      (clue.imageUrl || "").trim() &&
+      (clue.imageUrl2 || "").trim();
+
+    if (!hasTwoImages) {
+      panel.style.display = "none";
+      return;
+    }
+
+    panel.style.display = "block";
+    const index = state.game.activeImageIndex === 1 ? 1 : 0;
+    if (btn1) btn1.classList.toggle("active", index === 0);
+    if (btn2) btn2.classList.toggle("active", index === 1);
+  }
+
   function formatDelay(ms) {
     if (ms < 1000) return "+" + ms + "ms";
     return "+" + (ms / 1000).toFixed(2) + "s";
@@ -295,7 +325,9 @@
       ClueAudio.handleState(state, q, countdown, { isHost: true });
     } else {
       ClueAudio.teardown();
-      ClueMedia.renderInto(q, clue);
+      ClueMedia.renderInto(q, clue, {
+        imageIndex: state.game.activeImageIndex === 1 ? 1 : 0,
+      });
       if (!ClueMedia.hasContent(clue)) {
         q.textContent = "(no clue content)";
       }
@@ -414,6 +446,12 @@
   document
     .getElementById("showAnswerBtn")
     ?.addEventListener("click", () => Game.send({ type: "showAnswer" }));
+  document.getElementById("showImage1Btn")?.addEventListener("click", () => {
+    Game.send({ type: "setActiveImage", index: 0 });
+  });
+  document.getElementById("showImage2Btn")?.addEventListener("click", () => {
+    Game.send({ type: "setActiveImage", index: 1 });
+  });
   document.getElementById("playAudioBtn")?.addEventListener("click", () => {
     Game.send({ type: "startAudio" });
   });

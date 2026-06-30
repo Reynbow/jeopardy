@@ -1506,6 +1506,51 @@ textarea:focus {
   margin-top: 12px;
 }
 
+.image-host-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.image-host-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+}
+
+.image-host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.image-host-actions .btn.active {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: var(--gold-bright);
+  color: var(--gold-bright);
+  box-shadow: 0 0 0 1px var(--gold-bright) inset;
+}
+
+.settings-media-slot {
+  margin-bottom: 12px;
+}
+
+.settings-media-slot:last-of-type {
+  margin-bottom: 0;
+}
+
+.settings-media-slot-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 4px;
+}
+
 .audio-countdown {
   display: none;
   width: 72px;

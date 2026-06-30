@@ -303,6 +303,7 @@
       clueText.classList.remove("hidden-clue");
       ClueMedia.renderInto(clueText, clue, {
         hidden: !showQuestion,
+        imageIndex: state.game.activeImageIndex === 1 ? 1 : 0,
       });
     }
 

@@ -61,6 +61,18 @@ export default function HostPage() {
               </div>
             </div>
             <div className="golden-double-banner" id="goldenDoubleBanner" style={{ display: "none" }} />
+            <div className="image-host-panel" id="imageHostPanel" style={{ display: "none" }}>
+              <h3>Image clue</h3>
+              <p className="hint">Image 1 shows by default. Switch to image 2 when you want players to see it.</p>
+              <div className="image-host-actions">
+                <button className="btn" id="showImage1Btn" type="button">
+                  Show image 1
+                </button>
+                <button className="btn gold" id="showImage2Btn" type="button">
+                  Show image 2
+                </button>
+              </div>
+            </div>
             <div className="buzz-panel" id="buzzPanel" style={{ display: "none" }} />
             <div className="audio-host-panel" id="audioHostPanel" style={{ display: "none" }}>
               <h3>Audio clue</h3>
