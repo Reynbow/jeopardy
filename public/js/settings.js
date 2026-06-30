@@ -102,20 +102,39 @@
     setTimeout(() => saveIndicator.classList.remove("show"), 1200);
   }
 
+  const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+  const MAX_UPLOAD_LABEL = "8 MB";
+
+  function safeFilename(name) {
+    const cleaned = String(name || "")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/_+/g, "_")
+      .slice(-80);
+    return cleaned || "file";
+  }
+
   async function uploadMedia(file) {
     const code = RoomSession.getCode();
     const hostSecret = RoomSession.getHostSecret();
     if (!code || !hostSecret) throw new Error("Host session required");
 
-    const form = new FormData();
-    form.append("file", file);
-    form.append("code", code);
-    form.append("hostSecret", hostSecret);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      throw new Error("File too large (max " + MAX_UPLOAD_LABEL + ")");
+    }
 
-    const res = await fetch("/api/upload", { method: "POST", body: form });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Upload failed");
-    return data.url;
+    const upload = window.__blobUpload;
+    if (typeof upload !== "function") {
+      throw new Error("Upload unavailable — please reload the page");
+    }
+
+    const pathname = "jeopardy/" + Date.now() + "-" + safeFilename(file.name);
+    const blob = await upload(pathname, file, {
+      access: "public",
+      handleUploadUrl: "/api/upload",
+      contentType: file.type || undefined,
+      clientPayload: JSON.stringify({ code, hostSecret }),
+    });
+    return blob.url;
   }
 
   function renderAll() {

@@ -1,4 +1,5 @@
 import Script from "next/script";
+import { BlobUpload } from "@/components/BlobUpload";
 import { RoomGuard } from "@/components/RoomGuard";
 
 export default function SettingsPage() {
@@ -66,6 +67,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <BlobUpload />
       <Script src="/js/settings.js" strategy="afterInteractive" />
     </RoomGuard>
   );
